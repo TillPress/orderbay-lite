@@ -3,7 +3,7 @@
  * Plugin Name:       OrderBay Lite
  * Plugin URI:        https://tillpress.com/orderbay/
  * Description:       Free WooCommerce invoices: printable invoices, sequential invoice numbers, credit notes, customer My Account invoice download, and UBL 2.1 / Factur-X CII e-invoice XML export.
- * Version:           1.0.9
+ * Version:           1.1.1
  * Author:            Tillpress
  * Author URI:        https://tillpress.com
  * Requires at least: 6.2
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'OBLT_VERSION', '1.0.9' );
+define( 'OBLT_VERSION', '1.1.1' );
 define( 'OBLT_BRAND_NAME', 'OrderBay Lite' );
 define( 'OBLT_PLUGIN_FILE', __FILE__ );
 define( 'OBLT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );

@@ -23,6 +23,7 @@ class OBLT_Documents {
 		add_action( 'woocommerce_order_action_oblt_print_invoice', array( $this, 'action_print_invoice' ) );
 		add_action( 'woocommerce_admin_order_data_after_order_details', array( $this, 'order_screen_buttons' ) );
 		add_action( 'admin_post_oblt_print_invoice', array( $this, 'handle_print_invoice' ) );
+		add_action( 'admin_post_oblt_print_packing_slip', array( $this, 'handle_print_packing_slip' ) );
 		add_action( 'admin_post_oblt_pdf_download', array( $this, 'handle_pdf_download' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 	}
@@ -67,13 +68,14 @@ class OBLT_Documents {
 	 * so the CSS is registered as an inline style on a src-less handle and printed with
 	 * wp_print_styles(); the print button script the same way with wp_print_scripts().
 	 *
-	 * @param string $doc   Document type: invoice|credit-note.
+	 * @param string $doc   Document type: invoice|credit-note|packing-slip.
 	 * @param string $paper Paper size for @page (letter|A4).
 	 */
 	public static function print_document_assets( $doc, $paper ) {
-		$doc    = 'credit-note' === $doc ? 'credit-note' : 'invoice';
+		$doc    = in_array( $doc, array( 'credit-note', 'packing-slip' ), true ) ? $doc : 'invoice';
 		$handle = 'oblt-doc-' . $doc;
-		$file   = OBLT_PLUGIN_DIR . 'assets/' . $doc . '.css';
+		// The packing slip shares the invoice stylesheet.
+		$file   = OBLT_PLUGIN_DIR . 'assets/' . ( 'packing-slip' === $doc ? 'invoice' : $doc ) . '.css';
 		$css    = is_readable( $file ) ? (string) file_get_contents( $file ) : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local plugin file.
 		$paper  = 'A4' === $paper ? 'A4' : 'letter';
 		$css    = '@page { size: ' . $paper . '; margin: 12mm; }' . "\n" . $css;
@@ -329,6 +331,7 @@ class OBLT_Documents {
 		}
 		echo '<p class="form-field" style="clear:both;padding-left:0;">';
 		echo '<a class="button button-primary" target="_blank" href="' . esc_url( $this->print_url( $order->get_id() ) ) . '" style="margin:0 4px 4px 0;">' . esc_html__( 'Invoice', 'orderbay-lite' ) . '</a> ';
+		echo '<a class="button" target="_blank" href="' . esc_url( $this->packing_slip_url( $order->get_id() ) ) . '" style="margin:0 4px 4px 0;">' . esc_html__( 'Packing slip', 'orderbay-lite' ) . '</a> ';
 		$s = OBLT_Plugin::get_doc_settings();
 		if ( 'auto' === ( $s['pdf_engine'] ?? 'browser' ) && self::detect_pdf_engine() ) {
 			echo '<a class="button" href="' . esc_url( $this->pdf_url( $order->get_id() ) ) . '">' . esc_html__( 'Download PDF (host engine)', 'orderbay-lite' ) . '</a> ';
@@ -362,6 +365,12 @@ class OBLT_Documents {
 			esc_attr__( 'Invoice', 'orderbay-lite' ),
 			esc_html__( 'Inv', 'orderbay-lite' )
 		);
+		printf(
+			'<a class="button wc-action-button" href="%s" target="_blank" title="%s">%s</a> ',
+			esc_url( $this->packing_slip_url( $order->get_id() ) ),
+			esc_attr__( 'Packing slip', 'orderbay-lite' ),
+			esc_html__( 'Slip', 'orderbay-lite' )
+		);
 	}
 
 	/**
@@ -372,6 +381,17 @@ class OBLT_Documents {
 		return wp_nonce_url(
 			admin_url( 'admin-post.php?action=oblt_print_invoice&order_id=' . absint( $order_id ) ),
 			'oblt_print_invoice_' . absint( $order_id )
+		);
+	}
+
+	/**
+	 * @param int $order_id Order ID.
+	 * @return string
+	 */
+	public function packing_slip_url( $order_id ) {
+		return wp_nonce_url(
+			admin_url( 'admin-post.php?action=oblt_print_packing_slip&order_id=' . absint( $order_id ) ),
+			'oblt_print_packing_slip_' . absint( $order_id )
 		);
 	}
 
@@ -409,6 +429,28 @@ class OBLT_Documents {
 		do_action( 'oblt_before_document', 'invoice', $orders );
 		include self::locate_template( 'invoice.php' );
 		do_action( 'oblt_after_document', 'invoice', $orders );
+		exit;
+	}
+
+	/**
+	 * Print view for a packing slip. Unlike the invoice it never allocates an invoice number.
+	 */
+	public function handle_print_packing_slip() {
+		if ( ! current_user_can( 'edit_shop_orders' ) ) {
+			wp_die( esc_html__( 'Forbidden', 'orderbay-lite' ) );
+		}
+		$order_id = isset( $_GET['order_id'] ) ? absint( $_GET['order_id'] ) : 0; // phpcs:ignore
+		check_admin_referer( 'oblt_print_packing_slip_' . $order_id );
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			wp_die( esc_html__( 'Order not found', 'orderbay-lite' ) );
+		}
+		$settings = OBLT_Plugin::get_doc_settings();
+		$orders   = array( $order );
+		/** This action is documented in includes/class-oblt-documents.php */
+		do_action( 'oblt_before_document', 'packing-slip', $orders );
+		include self::locate_template( 'packing-slip.php' );
+		do_action( 'oblt_after_document', 'packing-slip', $orders );
 		exit;
 	}
 

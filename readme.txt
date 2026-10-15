@@ -4,7 +4,7 @@ Tags: woocommerce, invoice, credit note, e-invoice, pdf
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.9
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 WC requires at least: 7.0
@@ -18,6 +18,7 @@ OrderBay Lite adds the invoicing tools a WooCommerce store legally needs — fre
 * Printable invoice for every order (browser Print → Save as PDF; optional Dompdf/TCPDF if already installed on your host)
 * Sequential, race-free invoice numbers with configurable prefix, format tokens ({PREFIX} {YYYY} {MM} {SEQ:5} …), and yearly/monthly counter reset
 * Credit note numbers and a printable credit note for refunded orders
+* Packing slips: a price-free print view with items, SKUs, quantities, variation details, ship-to address, and customer note
 * Customers can download / print their own invoice from My Account (owner-only, nonce-protected)
 * E-invoice XML export: UBL 2.1 (Peppol BIS Billing 3.0) and UN/CEFACT CII (Factur-X EN16931 profile), with a seller-details readiness checklist
 * Invoice numbers are immutable once assigned and survive plugin updates
@@ -26,7 +27,7 @@ OrderBay Lite adds the invoicing tools a WooCommerce store legally needs — fre
 
 Not tax advice: invoice layout, numbering, VAT lines, and e-invoice files are tools — confirm legal requirements with your accountant or tax adviser. The e-invoice XML is an EN16931 baseline export; validate it with an official validator before relying on it, and note that OrderBay Lite does not transmit anything to the Peppol network.
 
-A paid **OrderBay** plugin (packing slips, delivery notes, shipping labels, proforma invoices, bulk printing, barcodes/QR, fulfillment desk, and more) is sold separately at https://tillpress.com/orderbay/. It is a different plugin. This Lite plugin is complete and is never locked.
+A paid **OrderBay** plugin (delivery notes, shipping labels, proforma invoices, bulk printing, barcodes/QR, fulfillment desk, and more) is sold separately at https://tillpress.com/orderbay/. It is a different plugin. This Lite plugin is complete and is never locked.
 
 == External services ==
 
@@ -39,7 +40,7 @@ OrderBay Lite has no license check, no telemetry, no account, and makes no outbo
 1. Upload the `orderbay-lite` folder to `/wp-content/plugins/`
 2. Activate through the Plugins menu (WooCommerce must be active)
 3. Open **WooCommerce → OrderBay Lite** and enter your business name/address, VAT / Tax ID, logo URL, and invoice number format
-4. Print an invoice from any order screen (Invoice button) or the orders list
+4. Print an invoice or packing slip from any order screen (Invoice / Packing slip buttons) or the orders list
 
 == Frequently Asked Questions ==
 
@@ -71,7 +72,7 @@ Only on its own Help & demo page: one box describing the paid OrderBay plugin wi
 Lite steps aside automatically so you do not get duplicate buttons or a second number sequence. You can deactivate Lite.
 
 = What does the paid OrderBay add? =
-Packing slips, delivery notes, shipping labels, proforma invoices, bulk document printing, barcodes and QR codes, custom branding options, a fulfillment desk, and more — at https://tillpress.com/orderbay/.
+Delivery notes, shipping labels, proforma invoices, bulk and multi-order packing slips, pick lists, bulk document printing, barcodes and QR codes, custom branding options, a fulfillment desk, and more — at https://tillpress.com/orderbay/.
 
 == Screenshots ==
 
@@ -81,6 +82,13 @@ Packing slips, delivery notes, shipping labels, proforma invoices, bulk document
 4. Customer My Account invoice download.
 
 == Changelog ==
+
+= 1.1.1 =
+* Security: the My Account invoice button opens only for the logged-in customer who placed the order. The billing-email match for guest orders is removed.
+* Fix: shop managers can save the settings page they can open.
+
+= 1.1.0 =
+* New: packing slips. A Packing slip button on the order screen and a Slip button in the Orders list open a price-free print view with items, SKUs, quantities (net of refunds), variation details, the ship-to address, and the customer note. Printing a packing slip never assigns an invoice number. Theme override: yourtheme/orderbay-lite/packing-slip.php.
 
 = 1.0.9 =
 * Dev: translator comments on the invoice-number and credit-note order notes.

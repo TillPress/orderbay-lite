@@ -1277,18 +1277,11 @@ class OBLT_Invoicing {
 		if ( user_can( $user_id, 'edit_shop_orders' ) ) {
 			return true;
 		}
+		// Ownership is the order's own customer_id only. The billing email is
+		// typed by the buyer and never verified, so it must not grant access:
+		// a guest order (customer_id 0) is not reachable from My Account.
 		$customer_id = (int) $order->get_customer_id();
-		if ( $customer_id && $customer_id === (int) $user_id ) {
-			return true;
-		}
-		$user = get_userdata( $user_id );
-		if ( $user && $user->user_email && strtolower( $user->user_email ) === strtolower( $order->get_billing_email() ) ) {
-			// Only match billing email if order has no customer_id (guest later linked) or matches.
-			if ( ! $customer_id || $customer_id === (int) $user_id ) {
-				return true;
-			}
-		}
-		return false;
+		return $customer_id > 0 && $customer_id === (int) $user_id;
 	}
 
 	/**
