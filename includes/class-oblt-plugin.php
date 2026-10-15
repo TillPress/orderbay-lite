@@ -32,6 +32,23 @@ class OBLT_Plugin {
 
 	private function __construct() {
 		add_action( 'admin_menu', array( $this, 'register_menu' ), 55 );
+		self::register_settings_capability();
+	}
+
+	/**
+	 * The settings form posts to options.php, which requires manage_options
+	 * by default. Let whoever can open the page (manage_woocommerce, as in
+	 * register_menu()) also save it, so shop managers are not refused.
+	 */
+	public static function register_settings_capability() {
+		add_filter( 'option_page_capability_oblt_documents', array( __CLASS__, 'settings_capability' ) );
+	}
+
+	/**
+	 * @return string
+	 */
+	public static function settings_capability() {
+		return 'manage_woocommerce';
 	}
 
 	/**
