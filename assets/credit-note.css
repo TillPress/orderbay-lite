@@ -1,0 +1,13 @@
+/* OrderBay Lite credit-note print sheet. @page size is prepended at runtime. */
+body { font-family: system-ui, sans-serif; font-size: 12.5px; margin: 16px; color: #111; }
+.sheet { page-break-after: always; max-width: 190mm; margin: 0 auto 28px; }
+.sheet:last-child { page-break-after: auto; }
+h1 { font-size: 20px; margin: 0 0 8px; }
+.meta { color: #555; margin-bottom: 12px; }
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { border-bottom: 1px solid #ddd; padding: 7px 6px; text-align: left; }
+th { border-bottom: 2px solid #222; }
+.num { text-align: right; }
+.totals { margin-top: 12px; text-align: right; font-weight: 700; }
+.footer { margin-top: 20px; color: #666; font-size: 11px; }
+@media print { .no-print { display: none !important; } body { margin: 0; } }

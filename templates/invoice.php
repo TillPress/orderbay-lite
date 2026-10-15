@@ -14,39 +14,11 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 <head>
 	<meta charset="utf-8" />
 	<title><?php echo esc_html__( 'Invoice', 'orderbay-lite' ); ?></title>
-	<style>
-		@page { size: <?php echo esc_attr( $oblt_paper ); ?>; margin: 12mm; }
-		* { box-sizing: border-box; }
-		body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; font-size: 12.5px; color: #111; margin: 16px; line-height: 1.4; }
-		.sheet { page-break-after: always; max-width: 190mm; margin: 0 auto 28px; }
-		.sheet:last-child { page-break-after: auto; }
-		.header { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 16px; align-items: flex-start; }
-		.logo { max-height: 56px; max-width: 200px; }
-		h1 { font-size: 20px; margin: 0 0 4px; }
-		.meta { color: #555; margin-bottom: 4px; }
-		.cols { display: flex; gap: 24px; margin-bottom: 16px; }
-		.cols > div { flex: 1; white-space: pre-line; }
-		.cols strong { display: block; margin-bottom: 4px; }
-		table.items { width: 100%; border-collapse: collapse; margin-top: 8px; }
-		table.items th, table.items td { border-bottom: 1px solid #ddd; padding: 7px 6px; text-align: left; vertical-align: top; }
-		table.items th { border-bottom: 2px solid #222; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
-		table.items .num { text-align: right; white-space: nowrap; }
-		.totals { margin-top: 12px; margin-left: auto; width: 260px; }
-		.totals .row { display: flex; justify-content: space-between; padding: 3px 0; }
-		.totals .row.grand { font-weight: 700; font-size: 14px; border-top: 2px solid #222; margin-top: 6px; padding-top: 8px; }
-		.notes { margin-top: 16px; padding: 8px 10px; background: #f6f7f7; border: 1px solid #e0e0e0; }
-		.footer { margin-top: 20px; color: #666; font-size: 11px; border-top: 1px solid #eee; padding-top: 8px; }
-		@media print {
-			.no-print, #wpadminbar, .woocommerce-store-notice { display: none !important; }
-			body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-			.sheet { page-break-after: always; break-after: page; }
-			.sheet:last-child { page-break-after: auto; break-after: auto; }
-		}
-	</style>
+	<?php OBLT_Documents::print_document_assets( 'invoice', $oblt_paper ); ?>
 </head>
 <body>
 <p class="no-print">
-	<button onclick="window.print()"><?php esc_html_e( 'Print / Save as PDF', 'orderbay-lite' ); ?></button>
+	<button type="button" class="oblt-print-btn"><?php esc_html_e( 'Print / Save as PDF', 'orderbay-lite' ); ?></button>
 		<span><?php
 		/* translators: 1: document count, 2: paper size. */
 		echo esc_html( sprintf( __( '%1$d document(s) · paper: %2$s', 'orderbay-lite' ), count( $orders ), $oblt_paper ) );
@@ -152,5 +124,6 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 		<?php endif; ?>
 	</div>
 <?php endforeach; ?>
+<?php OBLT_Documents::print_document_script(); ?>
 </body>
 </html>

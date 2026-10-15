@@ -1,0 +1,56 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "meta": {
+    "title": "orderbay-lite demo",
+    "description": "WooCommerce store with demo data created by the plugin's own Help & demo page.",
+    "author": "alextechgamer"
+  },
+  "landingPage": "/wp-admin/admin.php?page=oblt-help",
+  "preferredVersions": {
+    "php": "8.2",
+    "wp": "latest"
+  },
+  "features": {
+    "networking": false
+  },
+  "login": true,
+  "steps": [
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "wordpress.org/plugins",
+        "slug": "woocommerce"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "wordpress.org/plugins",
+        "slug": "orderbay-lite"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "woocommerce_onboarding_profile": {
+          "skipped": true
+        },
+        "woocommerce_coming_soon": "no",
+        "woocommerce_store_address": "1 Example Street",
+        "woocommerce_store_city": "Springfield",
+        "woocommerce_store_postcode": "12345",
+        "woocommerce_default_country": "US:IL"
+      }
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; wp_set_current_user( 1 ); if ( class_exists( 'OBLT_Demo' ) ) { OBLT_Demo::create(); }"
+    }
+  ]
+}

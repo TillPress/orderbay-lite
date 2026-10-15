@@ -85,7 +85,10 @@ class OBLT_EInvoice {
 			wp_die( esc_html__( 'Order not found', 'orderbay-lite' ) );
 		}
 		if ( class_exists( 'OBLT_Invoicing' ) ) {
-			OBLT_Invoicing::ensure_invoice_number( $order );
+			$number = OBLT_Invoicing::ensure_invoice_number( $order );
+			if ( '' === (string) $number ) {
+				wp_die( esc_html__( 'An invoice number could not be allocated. The document was not exported.', 'orderbay-lite' ) );
+			}
 		}
 
 		$pdf_bytes = OBLT_Documents::render_pdf_bytes( $order );
@@ -154,7 +157,10 @@ class OBLT_EInvoice {
 			wp_die( esc_html__( 'Order not found', 'orderbay-lite' ) );
 		}
 		if ( class_exists( 'OBLT_Invoicing' ) ) {
-			OBLT_Invoicing::ensure_invoice_number( $order );
+			$number = OBLT_Invoicing::ensure_invoice_number( $order );
+			if ( '' === (string) $number ) {
+				wp_die( esc_html__( 'An invoice number could not be allocated. The document was not exported.', 'orderbay-lite' ) );
+			}
 		}
 
 		$data = self::order_to_invoice_data( $order );
