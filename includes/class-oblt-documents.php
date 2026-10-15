@@ -61,6 +61,41 @@ class OBLT_Documents {
 	}
 
 	/**
+	 * Print the document stylesheet and print-button script for a standalone document view.
+	 *
+	 * Documents are full HTML pages (no wp_head), and the host PDF engine needs the CSS inline,
+	 * so the CSS is registered as an inline style on a src-less handle and printed with
+	 * wp_print_styles(); the print button script the same way with wp_print_scripts().
+	 *
+	 * @param string $doc   Document type: invoice|credit-note.
+	 * @param string $paper Paper size for @page (letter|A4).
+	 */
+	public static function print_document_assets( $doc, $paper ) {
+		$doc    = 'credit-note' === $doc ? 'credit-note' : 'invoice';
+		$handle = 'oblt-doc-' . $doc;
+		$file   = OBLT_PLUGIN_DIR . 'assets/' . $doc . '.css';
+		$css    = is_readable( $file ) ? (string) file_get_contents( $file ) : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local plugin file.
+		$paper  = 'A4' === $paper ? 'A4' : 'letter';
+		$css    = '@page { size: ' . $paper . '; margin: 12mm; }' . "\n" . $css;
+		if ( ! wp_style_is( $handle, 'registered' ) ) {
+			wp_register_style( $handle, false, array(), OBLT_VERSION );
+		}
+		wp_add_inline_style( $handle, $css );
+		wp_print_styles( array( $handle ) );
+	}
+
+	/**
+	 * Print the "Print / Save as PDF" button behaviour (attached to .oblt-print-btn).
+	 */
+	public static function print_document_script() {
+		if ( ! wp_script_is( 'oblt-doc-print', 'registered' ) ) {
+			wp_register_script( 'oblt-doc-print', false, array(), OBLT_VERSION, true );
+			wp_add_inline_script( 'oblt-doc-print', 'document.querySelectorAll(".oblt-print-btn").forEach(function(b){b.addEventListener("click",function(){window.print();});});' );
+		}
+		wp_print_scripts( array( 'oblt-doc-print' ) );
+	}
+
+	/**
 	 * Whether host has Dompdf or TCPDF available.
 	 *
 	 * @return string|false 'dompdf'|'tcpdf'|false
@@ -359,7 +394,10 @@ class OBLT_Documents {
 		}
 		$settings = OBLT_Plugin::get_doc_settings();
 		if ( class_exists( 'OBLT_Invoicing' ) ) {
-			OBLT_Invoicing::ensure_invoice_number( $order );
+			$number = OBLT_Invoicing::ensure_invoice_number( $order );
+			if ( '' === (string) $number ) {
+				wp_die( esc_html__( 'An invoice number could not be allocated. The document was not rendered.', 'orderbay-lite' ) );
+			}
 		}
 		$orders = array( $order );
 		/**
@@ -387,7 +425,10 @@ class OBLT_Documents {
 			return '';
 		}
 		if ( class_exists( 'OBLT_Invoicing' ) ) {
-			OBLT_Invoicing::ensure_invoice_number( $order );
+			$number = OBLT_Invoicing::ensure_invoice_number( $order );
+			if ( '' === (string) $number ) {
+				wp_die( esc_html__( 'An invoice number could not be allocated. The document was not rendered.', 'orderbay-lite' ) );
+			}
 		}
 		$settings = OBLT_Plugin::get_doc_settings();
 		$orders   = array( $order );

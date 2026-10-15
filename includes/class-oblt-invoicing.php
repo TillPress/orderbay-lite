@@ -10,6 +10,36 @@ class OBLT_Invoicing {
 
 	private static $instance = null;
 
+	/**
+	 * Test seam: competing same-order writer after empty identity read.
+	 *
+	 * @var callable|null
+	 */
+	public static $test_after_empty_identity_read = null;
+
+	/** Claim lease length (seconds). */
+	const CLAIM_TTL = 30;
+
+	/** @var array<string,string> Claim rows this request owns (option name => exact value). */
+	private static $claim_tokens = array();
+
+	/** @var int */
+	private static $claim_seq = 0;
+
+	/** @var int Loser backoff step in microseconds (tests set 0). */
+	public static $claim_wait_us = 25000;
+
+	/** @var callable|null Test hook: after allocation, before the owner-checked save. */
+	public static $test_before_claim_save = null;
+
+
+	/**
+	 * Test seam: competing increment after successful CAS claim.
+	 *
+	 * @var callable|null
+	 */
+	public static $test_after_cas_claim = null;
+
 	public static function instance() {
 		if ( is_null( self::$instance ) ) {
 			self::$instance = new self();
@@ -191,19 +221,19 @@ class OBLT_Invoicing {
 	 * @return string
 	 */
 	public static function ensure_invoice_number( $order ) {
-		if ( ! $order instanceof WC_Order ) {
-			return '';
-		}
-		$existing = $order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER );
-		if ( $existing ) {
-			return (string) $existing;
-		}
-		$number = self::allocate_number( OBLT_Plugin::OPT_INVOICE_PREFIX, OBLT_Plugin::OPT_INVOICE_NEXT, 'INV-', OBLT_Plugin::OPT_INVOICE_FORMAT, OBLT_Plugin::OPT_INVOICE_RESET );
-		$order->update_meta_data( OBLT_Plugin::META_INVOICE_NUMBER, $number );
-		/* translators: %s: invoice number. */
-		$order->add_order_note( sprintf( __( 'OrderBay Lite invoice number assigned: %s', 'orderbay-lite' ), $number ), false, true );
-		$order->save();
-		return $number;
+		return self::ensure_document_number(
+			$order,
+			'invoice',
+			OBLT_Plugin::META_INVOICE_NUMBER,
+			'_ob_invoice_number',
+			OBLT_Plugin::OPT_INVOICE_PREFIX,
+			OBLT_Plugin::OPT_INVOICE_NEXT,
+			'INV-',
+			OBLT_Plugin::OPT_INVOICE_FORMAT,
+			OBLT_Plugin::OPT_INVOICE_RESET,
+			/* translators: %s: invoice number. */
+			__( 'OrderBay Lite invoice number assigned: %s', 'orderbay-lite' )
+		);
 	}
 
 	/**
@@ -213,19 +243,476 @@ class OBLT_Invoicing {
 	 * @return string
 	 */
 	public static function ensure_credit_number( $order ) {
+		return self::ensure_document_number(
+			$order,
+			'credit',
+			OBLT_Plugin::META_CREDIT_NUMBER,
+			'_ob_credit_note_number',
+			OBLT_Plugin::OPT_CREDIT_PREFIX,
+			OBLT_Plugin::OPT_CREDIT_NEXT,
+			'CN-',
+			OBLT_Plugin::OPT_CREDIT_FORMAT,
+			OBLT_Plugin::OPT_CREDIT_RESET,
+			/* translators: %s: credit note number. */
+			__( 'OrderBay Lite credit note number issued: %s', 'orderbay-lite' )
+		);
+	}
+
+	/**
+	 * Claim order+type, allocate, persist. Empty return = fail closed (nothing saved).
+	 *
+	 * @param WC_Order $order           Order.
+	 * @param string   $type            invoice|credit.
+	 * @param string   $meta_key        Lite meta key.
+	 * @param string   $sibling_meta    Paid meta key to adopt.
+	 * @param string   $opt_prefix      Prefix option.
+	 * @param string   $opt_next        Next-counter option.
+	 * @param string   $default_prefix  Fallback prefix.
+	 * @param string   $opt_format      Format option.
+	 * @param string   $opt_reset       Reset option.
+	 * @param string   $note_sprintf    Order-note template with %s.
+	 * @return string
+	 */
+	private static function ensure_document_number( $order, $type, $meta_key, $sibling_meta, $opt_prefix, $opt_next, $default_prefix, $opt_format, $opt_reset, $note_sprintf ) {
 		if ( ! $order instanceof WC_Order ) {
 			return '';
 		}
-		$existing = $order->get_meta( OBLT_Plugin::META_CREDIT_NUMBER );
-		if ( $existing ) {
-			return (string) $existing;
+		$existing = self::adopt_existing_identity( $order, $meta_key, $sibling_meta );
+		if ( '' !== $existing ) {
+			return $existing;
 		}
-		$number = self::allocate_number( OBLT_Plugin::OPT_CREDIT_PREFIX, OBLT_Plugin::OPT_CREDIT_NEXT, 'CN-', OBLT_Plugin::OPT_CREDIT_FORMAT, OBLT_Plugin::OPT_CREDIT_RESET );
-		$order->update_meta_data( OBLT_Plugin::META_CREDIT_NUMBER, $number );
-		/* translators: %s: credit note number. */
-		$order->add_order_note( sprintf( __( 'OrderBay Lite credit note number issued: %s', 'orderbay-lite' ), $number ), false, true );
+		if ( is_callable( self::$test_after_empty_identity_read ) ) {
+			call_user_func( self::$test_after_empty_identity_read, $order, $type );
+			$existing = self::adopt_existing_identity( $order, $meta_key, $sibling_meta );
+			if ( '' !== $existing ) {
+				return $existing;
+			}
+		}
+		$order_id = (int) $order->get_id();
+		if ( ! self::try_claim_document( $order_id, $type ) ) {
+			return self::wait_for_winner_identity( $order, $meta_key, $sibling_meta );
+		}
+		// We own the claim: re-read the order from the database so a number saved by
+		// an earlier owner (whose lease we may have taken over) is adopted, not replaced.
+		$order    = self::fresh_order( $order );
+		$existing = self::adopt_existing_identity( $order, $meta_key, $sibling_meta );
+		if ( '' !== $existing ) {
+			self::release_document_claim( $order_id, $type );
+			return $existing;
+		}
+		$number = self::allocate_number( $opt_prefix, $opt_next, $default_prefix, $opt_format, $opt_reset );
+		if ( is_wp_error( $number ) || ! is_string( $number ) || '' === $number ) {
+			self::release_document_claim( $order_id, $type );
+			self::record_allocation_failure( $order, $type, $number );
+			return '';
+		}
+		if ( is_callable( self::$test_before_claim_save ) ) {
+			call_user_func( self::$test_before_claim_save, $order, $type, $number );
+		}
+		// Owner-checked save fence: renew our lease only if it is still ours. A worker
+		// whose lease expired and was taken over must not write its number.
+		if ( ! self::refresh_document_claim( $order_id, $type ) ) {
+			self::record_lost_claim( $order, $type, $number );
+			return self::wait_for_winner_identity( $order, $meta_key, $sibling_meta );
+		}
+		$order    = self::fresh_order( $order );
+		$existing = self::adopt_existing_identity( $order, $meta_key, $sibling_meta );
+		if ( '' !== $existing ) {
+			self::release_document_claim( $order_id, $type );
+			self::record_lost_claim( $order, $type, $number );
+			return $existing;
+		}
+		$order->update_meta_data( $meta_key, $number );
+		$order->add_order_note( sprintf( $note_sprintf, $number ), false, true );
 		$order->save();
+		self::release_document_claim( $order_id, $type );
 		return $number;
+	}
+
+	/**
+	 * Adopt Lite meta, else copy paid `_ob_` identity onto Lite meta.
+	 *
+	 * @param WC_Order $order        Order.
+	 * @param string   $meta_key     Lite meta.
+	 * @param string   $sibling_meta Paid meta.
+	 * @return string
+	 */
+	public static function adopt_existing_identity( $order, $meta_key, $sibling_meta ) {
+		if ( ! $order instanceof WC_Order ) {
+			return '';
+		}
+		$mine = $order->get_meta( $meta_key );
+		if ( $mine ) {
+			return (string) $mine;
+		}
+		if ( $sibling_meta ) {
+			$sib = $order->get_meta( $sibling_meta );
+			if ( $sib ) {
+				$order->update_meta_data( $meta_key, (string) $sib );
+				$order->save();
+				return (string) $sib;
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * Atomic per-order, per-document-type claim (lease).
+	 *
+	 * The claim row holds "<unix time>|<owner token>|<seq>". A free row is taken with
+	 * INSERT IGNORE; an expired row is taken over with a compare-and-swap on its exact
+	 * old value, so two workers can never both win and the stale owner's token stops
+	 * matching. Nothing is ever deleted that this request does not own.
+	 *
+	 * @param int    $order_id Order id.
+	 * @param string $type     Document type.
+	 * @return bool True if this caller now owns the claim.
+	 */
+	public static function try_claim_document( $order_id, $type ) {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'query' ) ) {
+			return false;
+		}
+		$key   = self::claim_option_key( $order_id, $type );
+		$token = self::new_claim_token();
+		$value = self::claim_value( $token );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		for ( $attempt = 0; $attempt < 2; $attempt++ ) {
+			$ins = $wpdb->query(
+				$wpdb->prepare(
+					"INSERT IGNORE INTO %i (option_name, option_value, autoload) VALUES (%s, %s, 'no')",
+					$wpdb->options,
+					$key,
+					$value
+				)
+			);
+			if ( false === $ins ) {
+				return false;
+			}
+			if ( (int) $ins > 0 ) {
+				self::$claim_tokens[ $key ] = $value;
+				self::forget_claim_cache( $key );
+				return true;
+			}
+			$current = $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT option_value FROM %i WHERE option_name = %s',
+					$wpdb->options,
+					$key
+				)
+			);
+			if ( null === $current || false === $current ) {
+				continue; // Released between our insert and read: try the insert once more.
+			}
+			if ( ! self::claim_is_expired( (string) $current ) ) {
+				return false;
+			}
+			$took = $wpdb->query(
+				$wpdb->prepare(
+					'UPDATE %i SET option_value = %s WHERE option_name = %s AND option_value = %s',
+					$wpdb->options,
+					$value,
+					$key,
+					(string) $current
+				)
+			);
+			if ( false !== $took && (int) $took > 0 ) {
+				self::$claim_tokens[ $key ] = $value;
+				self::forget_claim_cache( $key );
+				return true;
+			}
+			return false;
+		}
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return false;
+	}
+
+	/**
+	 * Renew our lease, but only if the row still holds exactly our value.
+	 *
+	 * @param int    $order_id Order id.
+	 * @param string $type     Document type.
+	 * @return bool False when another worker has taken the claim over.
+	 */
+	public static function refresh_document_claim( $order_id, $type ) {
+		global $wpdb;
+		$key  = self::claim_option_key( $order_id, $type );
+		$mine = isset( self::$claim_tokens[ $key ] ) ? (string) self::$claim_tokens[ $key ] : '';
+		if ( '' === $mine || ! isset( $wpdb ) || ! is_object( $wpdb ) ) {
+			return false;
+		}
+		$parts = explode( '|', $mine );
+		$next  = self::claim_value( isset( $parts[1] ) ? $parts[1] : self::new_claim_token() );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$upd = $wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i SET option_value = %s WHERE option_name = %s AND option_value = %s',
+				$wpdb->options,
+				$next,
+				$key,
+				$mine
+			)
+		);
+		if ( false === $upd || (int) $upd < 1 ) {
+			unset( self::$claim_tokens[ $key ] );
+			return false;
+		}
+		self::$claim_tokens[ $key ] = $next;
+		self::forget_claim_cache( $key );
+		return true;
+	}
+
+	/**
+	 * @param int    $order_id Order id.
+	 * @param string $type     Document type.
+	 * @return string
+	 */
+	public static function claim_option_key( $order_id, $type ) {
+		return 'oblt_doc_claim_' . preg_replace( '/[^a-z0-9_]/', '', strtolower( (string) $type ) ) . '_' . (int) $order_id;
+	}
+
+	/**
+	 * Release our claim. Owner-checked: a late worker cannot delete a newer owner's row.
+	 *
+	 * @param int    $order_id Order id.
+	 * @param string $type     Document type.
+	 */
+	private static function release_document_claim( $order_id, $type ) {
+		global $wpdb;
+		$key  = self::claim_option_key( $order_id, $type );
+		$mine = isset( self::$claim_tokens[ $key ] ) ? (string) self::$claim_tokens[ $key ] : '';
+		unset( self::$claim_tokens[ $key ] );
+		if ( '' === $mine || ! isset( $wpdb ) || ! is_object( $wpdb ) ) {
+			return;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query(
+			$wpdb->prepare(
+				'DELETE FROM %i WHERE option_name = %s AND option_value = %s',
+				$wpdb->options,
+				$key,
+				$mine
+			)
+		);
+		self::forget_claim_cache( $key );
+	}
+
+	/**
+	 * @param string $token Owner token.
+	 * @return string
+	 */
+	private static function claim_value( $token ) {
+		++self::$claim_seq;
+		return time() . '|' . $token . '|' . self::$claim_seq;
+	}
+
+	/** @return string */
+	private static function new_claim_token() {
+		try {
+			return bin2hex( random_bytes( 12 ) );
+		} catch ( \Exception $e ) {
+			return md5( uniqid( (string) wp_rand(), true ) );
+		}
+	}
+
+	/**
+	 * Legacy rows are a bare timestamp; new rows are "<ts>|<token>|<seq>".
+	 *
+	 * @param string $value Stored claim value.
+	 * @return bool
+	 */
+	public static function claim_is_expired( $value ) {
+		$ts = (int) strtok( (string) $value, '|' );
+		return ( time() - $ts ) > self::CLAIM_TTL;
+	}
+
+	/**
+	 * @param string $key Option name.
+	 */
+	private static function forget_claim_cache( $key ) {
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( $key, 'options' );
+			wp_cache_delete( 'notoptions', 'options' );
+		}
+	}
+
+	/**
+	 * Re-read an order from the database (drop request-local caches first).
+	 *
+	 * @param WC_Order $order Order.
+	 * @return WC_Order
+	 */
+	private static function fresh_order( $order ) {
+		if ( ! $order instanceof WC_Order || ! function_exists( 'wc_get_order' ) ) {
+			return $order;
+		}
+		$id = (int) $order->get_id();
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( $id, 'orders' );
+			wp_cache_delete( $id, 'post_meta' );
+		}
+		if ( function_exists( 'clean_post_cache' ) ) {
+			clean_post_cache( $id );
+		}
+		if ( function_exists( 'wc_get_container' ) && class_exists( '\Automattic\WooCommerce\Caches\OrderCache' ) ) {
+			try {
+				wc_get_container()->get( '\Automattic\WooCommerce\Caches\OrderCache' )->remove( $id );
+			} catch ( \Throwable $e ) {
+				unset( $e ); // Cache helper unavailable: the plain cache deletes above still apply.
+			}
+		}
+		$fresh = wc_get_order( $id );
+		return ( $fresh instanceof WC_Order && (int) $fresh->get_id() === $id ) ? $fresh : $order;
+	}
+
+	/**
+	 * A stalled worker lost its claim after allocating: the number is a gap, never saved.
+	 *
+	 * @param WC_Order $order  Order.
+	 * @param string   $type   Document type.
+	 * @param string   $number Unused allocated number.
+	 */
+	private static function record_lost_claim( $order, $type, $number ) {
+		if ( $order instanceof WC_Order ) {
+			$order->add_order_note(
+				sprintf(
+					/* translators: 1: document number, 2: document type */
+					__( 'Document number %1$s (%2$s) was allocated by a request that lost its lock and was not used. This order keeps its existing number.', 'orderbay-lite' ),
+					$number,
+					$type
+				),
+				false,
+				true
+			);
+		}
+		$GLOBALS['oblt_lost_claims'][] = array(
+			'type'   => $type,
+			'number' => $number,
+		);
+	}
+
+	/**
+	 * Loser of the claim re-reads the winner's persisted number (short backoff).
+	 *
+	 * @param WC_Order $order        Order.
+	 * @param string   $meta_key     Meta key.
+	 * @param string   $sibling_meta Sibling meta.
+	 * @return string
+	 */
+	private static function wait_for_winner_identity( $order, $meta_key, $sibling_meta ) {
+		for ( $i = 0; $i < 8; $i++ ) {
+			if ( $i > 0 && self::$claim_wait_us > 0 ) {
+				usleep( self::$claim_wait_us * $i );
+			}
+			$order    = self::fresh_order( $order );
+			$existing = self::adopt_existing_identity( $order, $meta_key, $sibling_meta );
+			if ( '' !== $existing ) {
+				return $existing;
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * @param WC_Order|null   $order Order.
+	 * @param string          $type  Type.
+	 * @param WP_Error|string $error Error.
+	 */
+	public static function record_allocation_failure( $order, $type, $error ) {
+		$msg = is_wp_error( $error ) ? $error->get_error_message() : __( 'OrderBay Lite could not allocate a document number. The document was not saved.', 'orderbay-lite' );
+		if ( $order instanceof WC_Order ) {
+			$order->add_order_note( $msg, false, true );
+		}
+		if ( function_exists( 'add_settings_error' ) ) {
+			add_settings_error( 'orderbay-lite', 'oblt_alloc_failed', $msg, 'error' );
+		}
+		$GLOBALS['oblt_allocation_failures'][] = array(
+			'type'    => $type,
+			'message' => $msg,
+		);
+	}
+
+	/**
+	 * Copy paid numbering settings into Lite (downgrade). Idempotent.
+	 *
+	 * Prefix/format/reset: copy only when Lite has none.
+	 * Counters: raise Lite to max(lite, paid).
+	 */
+	public static function migrate_paid_settings() {
+		$map = array(
+			'ob_invoice_prefix' => OBLT_Plugin::OPT_INVOICE_PREFIX,
+			'ob_invoice_format' => OBLT_Plugin::OPT_INVOICE_FORMAT,
+			'ob_invoice_reset'  => OBLT_Plugin::OPT_INVOICE_RESET,
+			'ob_invoice_next'   => OBLT_Plugin::OPT_INVOICE_NEXT,
+			'ob_credit_prefix'  => OBLT_Plugin::OPT_CREDIT_PREFIX,
+			'ob_credit_format'  => OBLT_Plugin::OPT_CREDIT_FORMAT,
+			'ob_credit_reset'   => OBLT_Plugin::OPT_CREDIT_RESET,
+			'ob_credit_next'    => OBLT_Plugin::OPT_CREDIT_NEXT,
+		);
+		foreach ( $map as $from => $to ) {
+			$paid = get_option( $from, false );
+			$lite = get_option( $to, false );
+			if ( self::option_is_counter( $to ) ) {
+				self::adopt_counter_max( $to, $lite, $paid );
+				continue;
+			}
+			if ( false !== $lite ) {
+				continue;
+			}
+			if ( false !== $paid ) {
+				add_option( $to, $paid, '', 'no' );
+			}
+		}
+		global $wpdb;
+		if ( isset( $wpdb ) && is_object( $wpdb ) && method_exists( $wpdb, 'get_results' ) && isset( $wpdb->options ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT option_name, option_value FROM %i WHERE option_name LIKE %s OR option_name LIKE %s",
+					$wpdb->options,
+					$wpdb->esc_like( 'ob_invoice_next_' ) . '%',
+					$wpdb->esc_like( 'ob_credit_next_' ) . '%'
+				)
+			);
+			if ( is_array( $rows ) ) {
+				foreach ( $rows as $row ) {
+					$name = is_object( $row ) ? (string) $row->option_name : '';
+					$val  = is_object( $row ) ? $row->option_value : '';
+					if ( '' === $name || 0 !== strpos( $name, 'ob_' ) || 0 === strpos( $name, 'oblt_' ) ) {
+						continue;
+					}
+					$lite_name = 'oblt_' . substr( $name, 3 );
+					self::adopt_counter_max( $lite_name, get_option( $lite_name, false ), $val );
+				}
+			}
+		}
+	}
+
+	/**
+	 * @param string $name Option name.
+	 * @return bool
+	 */
+	public static function option_is_counter( $name ) {
+		return (bool) preg_match( '/_next(_|$)/', (string) $name );
+	}
+
+	/**
+	 * @param string $dest     Option name.
+	 * @param mixed  $existing Current value or false.
+	 * @param mixed  $incoming Incoming value or false.
+	 */
+	public static function adopt_counter_max( $dest, $existing, $incoming ) {
+		$max = max( (int) $existing, (int) $incoming );
+		if ( $max < 1 ) {
+			return;
+		}
+		if ( false === $existing || null === $existing || '' === $existing ) {
+			add_option( $dest, $max, '', 'no' );
+			return;
+		}
+		if ( (int) $existing < $max ) {
+			update_option( $dest, $max, 'no' );
+		}
 	}
 
 	/**
@@ -254,23 +741,317 @@ class OBLT_Invoicing {
 	}
 
 	/**
-	 * Allocate the next gapless sequence number for a document type.
+	 * Sequence integer encoded in a stored document number for the current namespace.
 	 *
-	 * Race-free: the previous read-modify-write on an option let two concurrent prints
-	 * read the same value and both return it (duplicate invoice numbers — a legal problem
-	 * for tax invoices). Here the counter is seeded if missing and then incremented
-	 * atomically in the database. MySQL: LAST_INSERT_ID() (per-connection). SQLite: INSERT OR IGNORE
-	 * plus an integer UPDATE (Playground / reviewer installs). Every caller gets a distinct number.
+	 * @param string $stored   Stored document number.
+	 * @param string $template Format template.
+	 * @param string $prefix   Prefix token value.
+	 * @param int    $ts       Timestamp used for date tokens.
+	 * @return int
+	 */
+	private static function seq_in_namespace( $stored, $template, $prefix, $ts ) {
+		$stored = (string) $stored;
+		if ( '' === $stored ) {
+			return 0;
+		}
+		$template = is_string( $template ) && '' !== trim( $template ) ? $template : '{PREFIX}{SEQ}';
+		$quoted   = preg_quote( $template, '/' );
+		$token_map = array(
+			'{PREFIX}' => preg_quote( (string) $prefix, '/' ),
+			'{YYYY}'   => preg_quote( gmdate( 'Y', $ts ), '/' ),
+			'{YY}'     => preg_quote( gmdate( 'y', $ts ), '/' ),
+			'{MM}'     => preg_quote( gmdate( 'm', $ts ), '/' ),
+			'{DD}'     => preg_quote( gmdate( 'd', $ts ), '/' ),
+		);
+		foreach ( $token_map as $token => $replacement ) {
+			$quoted = str_replace( preg_quote( $token, '/' ), $replacement, $quoted );
+		}
+		$quoted = preg_replace( '/\\\\\{SEQ(?::\d{1,2})?\\\\\}/', '(\d+)', $quoted );
+		if ( ! is_string( $quoted ) || ! preg_match( '/^' . $quoted . '$/', $stored, $m ) ) {
+			return 0;
+		}
+		$seq = isset( $m[1] ) ? (int) $m[1] : 0;
+		return $seq > 0 ? $seq : 0;
+	}
+
+	/**
+	 * SELECT meta_value only — no wc_get_orders / object hydration.
 	 *
-	 * @param string $opt_prefix     Option key for the prefix.
-	 * @param string $opt_next       Option key for the next integer.
-	 * @param string $default_prefix Fallback prefix.
-	 * @param string $opt_format     Optional option key for the format template ('' → '{PREFIX}{SEQ}').
-	 * @param string $opt_reset      Optional option key for the reset period ('' → 'none').
+	 * @param string[] $meta_keys Meta keys.
+	 * @return string[]
+	 */
+	private static function query_existing_document_numbers( $meta_keys ) {
+		$numbers = array();
+		$keys    = array();
+		foreach ( (array) $meta_keys as $k ) {
+			$k = (string) $k;
+			if ( '' !== $k ) {
+				$keys[] = $k;
+			}
+		}
+		$keys = array_values( array_unique( $keys ) );
+		if ( ! $keys ) {
+			return $numbers;
+		}
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_col' ) ) {
+			return $numbers;
+		}
+		$tables = array();
+		if ( isset( $wpdb->postmeta ) && $wpdb->postmeta ) {
+			$tables[] = $wpdb->postmeta;
+		}
+		if ( isset( $wpdb->prefix ) ) {
+			$tables[] = $wpdb->prefix . 'postmeta';
+			$tables[] = $wpdb->prefix . 'wc_orders_meta';
+		}
+		$tables = array_values( array_unique( array_filter( $tables ) ) );
+		foreach ( $tables as $table ) {
+			if ( ! self::meta_table_exists( $table ) ) {
+				continue; // HPOS table not created yet (fresh install / Playground).
+			}
+			foreach ( $keys as $meta_key ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$rows = $wpdb->get_col(
+					$wpdb->prepare(
+						"SELECT meta_value FROM %i WHERE meta_key = %s AND meta_value <> ''",
+						$table,
+						$meta_key
+					)
+				);
+				if ( is_array( $rows ) ) {
+					foreach ( $rows as $row ) {
+						if ( '' !== (string) $row ) {
+							$numbers[] = (string) $row;
+						}
+					}
+				}
+			}
+		}
+		return $numbers;
+	}
+
+	/**
+	 * Does a meta table exist? Cached per request.
+	 *
+	 * @param string $table Table name.
+	 * @return bool
+	 */
+	private static function meta_table_exists( $table ) {
+		static $seen = array();
+		if ( isset( $seen[ $table ] ) ) {
+			return $seen[ $table ];
+		}
+		global $wpdb;
+		if ( ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'esc_like' ) ) {
+			$seen[ $table ] = true;
+			return true;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- schema probe, cached per request.
+		$found          = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+		$seen[ $table ] = ( null === $found ) ? false : true;
+		return $seen[ $table ];
+	}
+
+	/**
+	 * @param string[] $meta_keys Meta keys.
+	 * @param string   $template  Template.
+	 * @param string   $prefix    Prefix.
+	 * @param int      $ts        Timestamp.
+	 * @return int
+	 */
+	private static function high_water_seq( $meta_keys, $template, $prefix, $ts ) {
+		$max = 0;
+		foreach ( self::query_existing_document_numbers( $meta_keys ) as $number ) {
+			$seq = self::seq_in_namespace( $number, $template, $prefix, $ts );
+			if ( $seq > $max ) {
+				$max = $seq;
+			}
+		}
+		return $max;
+	}
+
+	/**
+	 * @param string $opt_next Counter option.
+	 * @param string $period   Period suffix.
 	 * @return string
 	 */
+	public static function highwater_marker_key( $opt_next, $period = '' ) {
+		$base = (string) $opt_next;
+		$base = preg_replace( '/_next$/', '', $base );
+		$key  = $base . '_highwater_checked';
+		return '' !== $period ? $key . '_' . $period : $key;
+	}
+
+	/**
+	 * Compare-and-swap increment for the SQLite drop-in.
+	 *
+	 * @param object $wpdb        Database.
+	 * @param string $counter_opt Option name.
+	 * @param int    $seed        Minimum next-to-issue.
+	 * @param int    $max_tries   Retry cap.
+	 * @return int|WP_Error
+	 */
+	public static function sqlite_cas_increment( $wpdb, $counter_opt, $seed = 1, $max_tries = 12 ) {
+		$seed      = max( 1, (int) $seed );
+		$max_tries = max( 1, (int) $max_tries );
+		for ( $i = 0; $i < $max_tries; $i++ ) {
+			$current = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- atomic document counter; must read the live row, never a cache.
+				$wpdb->prepare(
+					"SELECT option_value FROM %i WHERE option_name = %s",
+					$wpdb->options,
+					$counter_opt
+				)
+			);
+			if ( $current < 1 ) {
+				$current = 1;
+			}
+			if ( $current < $seed ) {
+				$bumped = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- atomic document counter; must read the live row, never a cache.
+					$wpdb->prepare(
+						"UPDATE %i SET option_value = %d WHERE option_name = %s AND option_value = %s",
+						$wpdb->options,
+						$seed,
+						$counter_opt,
+						(string) $current
+					)
+				);
+				if ( false === $bumped || ( isset( $wpdb->last_error ) && is_string( $wpdb->last_error ) && '' !== $wpdb->last_error ) ) {
+					return new WP_Error( 'oblt_alloc_db', __( 'OrderBay Lite could not update the document counter.', 'orderbay-lite' ) );
+				}
+				continue;
+			}
+			$desired = $current + 1;
+			$updated = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- atomic document counter; must read the live row, never a cache.
+				$wpdb->prepare(
+					"UPDATE %i SET option_value = %d WHERE option_name = %s AND option_value = %s",
+					$wpdb->options,
+					$desired,
+					$counter_opt,
+					(string) $current
+				)
+			);
+			if ( false === $updated || ( isset( $wpdb->last_error ) && is_string( $wpdb->last_error ) && '' !== $wpdb->last_error ) ) {
+				return new WP_Error( 'oblt_alloc_db', __( 'OrderBay Lite could not update the document counter.', 'orderbay-lite' ) );
+			}
+			if ( is_numeric( $updated ) && (int) $updated < 1 ) {
+				continue;
+			}
+			if ( is_callable( self::$test_after_cas_claim ) ) {
+				call_user_func( self::$test_after_cas_claim, $wpdb, $counter_opt, $desired );
+			}
+			return $desired;
+		}
+		return new WP_Error( 'oblt_alloc_exhausted', __( 'OrderBay Lite could not allocate a document number after repeated conflicts. The document was not saved.', 'orderbay-lite' ) );
+	}
+
+	/**
+	 * Canonical counter both editions increment (paid option name).
+	 *
+	 * @param string $opt_next Edition counter option (base, no period).
+	 * @param string $period   Period suffix or ''.
+	 * @return string
+	 */
+	public static function shared_counter_option( $opt_next, $period = '' ) {
+		$map = array(
+			'oblt_invoice_next' => 'ob_invoice_next',
+			'oblt_credit_next'  => 'ob_credit_next',
+			'ob_invoice_next'   => 'ob_invoice_next',
+			'ob_credit_next'    => 'ob_credit_next',
+		);
+		$base = isset( $map[ $opt_next ] ) ? $map[ $opt_next ] : $opt_next;
+		return '' !== $period ? $base . '_' . $period : $base;
+	}
+
+	/**
+	 * @param string $opt_next Edition counter option (base, no period).
+	 * @param string $period   Period suffix or ''.
+	 * @return string
+	 */
+	public static function sibling_counter_option( $opt_next, $period = '' ) {
+		$map = array(
+			'oblt_invoice_next' => 'ob_invoice_next',
+			'oblt_credit_next'  => 'ob_credit_next',
+			'ob_invoice_next'   => 'oblt_invoice_next',
+			'ob_credit_next'    => 'oblt_credit_next',
+		);
+		if ( ! isset( $map[ $opt_next ] ) ) {
+			return '';
+		}
+		$sib = $map[ $opt_next ];
+		return '' !== $period ? $sib . '_' . $period : $sib;
+	}
+
+	/**
+	 * @param string $name Option name.
+	 * @return int
+	 */
+	public static function read_counter_value( $name ) {
+		if ( ! is_string( $name ) || '' === $name ) {
+			return 0;
+		}
+		global $wpdb;
+		$n = 0;
+		if ( isset( $wpdb ) && is_object( $wpdb ) && method_exists( $wpdb, 'get_var' ) && isset( $wpdb->options ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$row = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT option_value FROM %i WHERE option_name = %s",
+					$wpdb->options,
+					$name
+				)
+			);
+			if ( null !== $row && false !== $row && '' !== (string) $row ) {
+				$n = (int) $row;
+			}
+		}
+		return max( $n, (int) get_option( $name, 0 ) );
+	}
+
+	/**
+	 * @param string $name Counter option.
+	 * @param int    $next Next-to-issue.
+	 */
+	private static function mirror_counter_value( $name, $next ) {
+		$next = (int) $next;
+		if ( ! is_string( $name ) || '' === $name || $next < 1 ) {
+			return;
+		}
+		global $wpdb;
+		if ( isset( $wpdb ) && is_object( $wpdb ) && method_exists( $wpdb, 'query' ) && isset( $wpdb->options ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query(
+				$wpdb->prepare(
+					"INSERT IGNORE INTO %i (option_name, option_value, autoload) VALUES (%s, %s, 'no')",
+					$wpdb->options,
+					$name,
+					(string) $next
+				)
+			);
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query(
+				$wpdb->prepare(
+					"UPDATE %i SET option_value = %d WHERE option_name = %s AND option_value + 0 < %d",
+					$wpdb->options,
+					$next,
+					$name,
+					$next
+				)
+			);
+		}
+		$cur = get_option( $name, false );
+		if ( false === $cur ) {
+			add_option( $name, $next, '', 'no' );
+		} elseif ( (int) $cur < $next ) {
+			update_option( $name, $next, 'no' );
+		}
+		wp_cache_delete( $name, 'options' );
+	}
+
 	public static function allocate_number( $opt_prefix, $opt_next, $default_prefix, $opt_format = '', $opt_reset = '' ) {
 		global $wpdb;
+
+		self::migrate_paid_settings();
 
 		$prefix = get_option( $opt_prefix, $default_prefix );
 		if ( ! is_string( $prefix ) || '' === $prefix ) {
@@ -283,69 +1064,101 @@ class OBLT_Invoicing {
 		}
 		$reset = $opt_reset ? (string) get_option( $opt_reset, 'none' ) : 'none';
 
-		// Store-local time drives both the counter bucket and the date tokens, so the year
-		// printed in the number always matches the bucket it was drawn from (no cross-year gaps).
 		$ts     = function_exists( 'current_time' ) ? (int) current_time( 'timestamp' ) : time(); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
 		$period = self::period_key( $reset, $ts );
 
-		// Period-scoped counter row when a reset is configured (e.g. oblt_invoice_next_2026);
-		// the base row is used unchanged when reset = none.
-		$counter_opt = '' !== $period ? $opt_next . '_' . $period : $opt_next;
+		$local_opt   = '' !== $period ? $opt_next . '_' . $period : $opt_next;
+		$shared_opt  = self::shared_counter_option( $opt_next, $period );
+		$sibling_opt = self::sibling_counter_option( $opt_next, $period );
+		$counter_opt = $shared_opt;
 
-		// Seed + increment. Both branches use MySQL dialect: the SQLite drop-in
-		// (Playground / reviewer) translates MySQL, and rejects SQLite-native SQL
-		// (INSERT OR IGNORE, CAST AS INTEGER). MySQL: LAST_INSERT_ID() is per-connection
-		// and race-free. SQLite translator: option_value + 1 then SELECT (single-process).
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- atomic gapless invoice numbers require a single SQL increment; cache is dropped below.
-		$is_sqlite = self::db_is_sqlite();
-		if ( $is_sqlite ) {
-			$wpdb->query(
-				$wpdb->prepare(
-					"INSERT IGNORE INTO %i (option_name, option_value, autoload) VALUES (%s, '1', 'no')",
-					$wpdb->options,
-					$counter_opt
-				)
-			);
-			$wpdb->query(
-				$wpdb->prepare(
-					"UPDATE %i SET option_value = option_value + 1 WHERE option_name = %s",
-					$wpdb->options,
-					$counter_opt
-				)
-			);
-			$next = (int) $wpdb->get_var(
+		$meta_key = ( OBLT_Plugin::OPT_CREDIT_NEXT === $opt_next ) ? OBLT_Plugin::META_CREDIT_NUMBER : OBLT_Plugin::META_INVOICE_NUMBER;
+		$sibling  = ( OBLT_Plugin::OPT_CREDIT_NEXT === $opt_next ) ? '_ob_credit_note_number' : '_ob_invoice_number';
+		$marker_key = self::highwater_marker_key( $opt_next, $period );
+		$counter_row = null;
+		if ( isset( $wpdb ) && is_object( $wpdb ) && method_exists( $wpdb, 'get_var' ) ) {
+			$counter_row = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- atomic document counter; must read the live row, never a cache.
 				$wpdb->prepare(
 					"SELECT option_value FROM %i WHERE option_name = %s",
 					$wpdb->options,
 					$counter_opt
 				)
 			);
+		}
+		$counter_missing = ( null === $counter_row || false === $counter_row || '' === (string) $counter_row );
+		$marker_missing  = ( false === get_option( $marker_key, false ) );
+		$seed            = max(
+			1,
+			self::read_counter_value( $shared_opt ),
+			self::read_counter_value( $local_opt ),
+			self::read_counter_value( $sibling_opt )
+		);
+		if ( $counter_missing || $marker_missing ) {
+			$high = self::high_water_seq( array( $meta_key, $sibling ), $template, $prefix, $ts );
+			$seed = max( $seed, $high + 1 );
+			if ( $seed < 1 ) {
+				$seed = 1;
+			}
+			update_option( $marker_key, $high, 'no' );
+		}
+
+		$is_sqlite = self::db_is_sqlite();
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$ins = $wpdb->query(
+			$wpdb->prepare(
+				"INSERT IGNORE INTO %i (option_name, option_value, autoload) VALUES (%s, %s, 'no')",
+				$wpdb->options,
+				$counter_opt,
+				(string) $seed
+			)
+		);
+		if ( false === $ins || ( isset( $wpdb->last_error ) && is_string( $wpdb->last_error ) && '' !== $wpdb->last_error ) ) {
+			return new WP_Error( 'oblt_alloc_db', __( 'OrderBay Lite could not seed the document counter.', 'orderbay-lite' ) );
+		}
+		$bump = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE %i SET option_value = %d WHERE option_name = %s AND option_value + 0 < %d",
+				$wpdb->options,
+				$seed,
+				$counter_opt,
+				$seed
+			)
+		);
+		if ( false === $bump || ( isset( $wpdb->last_error ) && is_string( $wpdb->last_error ) && '' !== $wpdb->last_error ) ) {
+			return new WP_Error( 'oblt_alloc_db', __( 'OrderBay Lite could not seed the document counter.', 'orderbay-lite' ) );
+		}
+		if ( $is_sqlite ) {
+			$next = self::sqlite_cas_increment( $wpdb, $counter_opt, $seed );
 		} else {
-			$wpdb->query(
-				$wpdb->prepare(
-					"INSERT IGNORE INTO %i (option_name, option_value, autoload) VALUES (%s, '1', 'no')",
-					$wpdb->options,
-					$counter_opt
-				)
-			);
-			$wpdb->query(
+			$upd = $wpdb->query(
 				$wpdb->prepare(
 					"UPDATE %i SET option_value = LAST_INSERT_ID(option_value + 1) WHERE option_name = %s",
 					$wpdb->options,
 					$counter_opt
 				)
 			);
+			if ( false === $upd || ( isset( $wpdb->last_error ) && is_string( $wpdb->last_error ) && '' !== $wpdb->last_error ) ) {
+				return new WP_Error( 'oblt_alloc_db', __( 'OrderBay Lite could not allocate a document number.', 'orderbay-lite' ) );
+			}
 			$next = (int) $wpdb->get_var( 'SELECT LAST_INSERT_ID()' );
 		}
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$seq  = $next - 1;
+		if ( is_wp_error( $next ) ) {
+			return $next;
+		}
+		$seq = (int) $next - 1;
 		if ( $seq < 1 ) {
-			$seq = 1;
+			return new WP_Error( 'oblt_alloc_invalid', __( 'OrderBay Lite could not allocate a document number. The document was not saved.', 'orderbay-lite' ) );
 		}
 
-		// The direct writes bypass the options cache — drop the stale entries.
 		wp_cache_delete( $counter_opt, 'options' );
 		wp_cache_delete( 'notoptions', 'options' );
+		if ( $local_opt !== $counter_opt ) {
+			self::mirror_counter_value( $local_opt, (int) $next );
+		}
+		if ( $sibling_opt && $sibling_opt !== $counter_opt ) {
+			self::mirror_counter_value( $sibling_opt, (int) $next );
+		}
 
 		return self::format_number( $template, $seq, $ts, $prefix );
 	}
@@ -426,7 +1239,10 @@ class OBLT_Invoicing {
 			wp_die( esc_html__( 'No refunds and no credit note number on this order.', 'orderbay-lite' ) );
 		}
 		if ( $has_refunds || $has_number ) {
-			self::ensure_credit_number( $order );
+			$cn = self::ensure_credit_number( $order );
+			if ( '' === (string) $cn ) {
+				wp_die( esc_html__( 'A credit note number could not be allocated. The document was not rendered.', 'orderbay-lite' ) );
+			}
 		}
 		$settings = OBLT_Plugin::get_doc_settings();
 		$orders   = array( $order );
@@ -537,7 +1353,10 @@ class OBLT_Invoicing {
 		if ( ! $order || ! self::customer_can_view_invoice( $order ) ) {
 			wp_die( esc_html__( 'You cannot view this invoice.', 'orderbay-lite' ), 403 );
 		}
-		self::ensure_invoice_number( $order );
+		$number = self::ensure_invoice_number( $order );
+		if ( '' === (string) $number ) {
+			wp_die( esc_html__( 'Your invoice could not be prepared because a document number could not be allocated. Please try again or contact the store.', 'orderbay-lite' ), 500 );
+		}
 		$settings = OBLT_Plugin::get_doc_settings();
 		$orders   = array( $order );
 		include OBLT_Documents::locate_template( 'invoice.php' );

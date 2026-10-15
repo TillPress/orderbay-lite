@@ -3,7 +3,7 @@
  * Plugin Name:       OrderBay Lite
  * Plugin URI:        https://tillpress.com/orderbay/
  * Description:       Free WooCommerce invoices: printable invoices, sequential invoice numbers, credit notes, customer My Account invoice download, and UBL 2.1 / Factur-X CII e-invoice XML export.
- * Version:           1.0.1
+ * Version:           1.0.9
  * Author:            Tillpress
  * Author URI:        https://tillpress.com
  * Requires at least: 6.2
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'OBLT_VERSION', '1.0.1' );
+define( 'OBLT_VERSION', '1.0.9' );
 define( 'OBLT_BRAND_NAME', 'OrderBay Lite' );
 define( 'OBLT_PLUGIN_FILE', __FILE__ );
 define( 'OBLT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -30,6 +30,9 @@ require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-plugin.php';
 require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-documents.php';
 require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-invoicing.php';
 require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-einvoice.php';
+require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-demo.php';
+require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-support.php';
+require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-hub.php';
 
 /**
  * Whether the paid OrderBay plugin is active. Lite steps aside so a store
@@ -59,8 +62,25 @@ function oblt_init() {
 	OBLT_Documents::instance();
 	OBLT_Invoicing::instance();
 	OBLT_EInvoice::instance();
+	if ( is_admin() ) {
+		OBLT_Support::instance();
+		OBLT_Hub::instance();
+	}
 }
 add_action( 'plugins_loaded', 'oblt_init', 20 );
+
+register_activation_hook( __FILE__, 'oblt_activate' );
+/**
+ * Raise Lite counters to max(lite, paid) and drop the one-shot high-water marker
+ * so the first allocation after a paid stretch cannot reuse INV-N.
+ */
+function oblt_activate() {
+	if ( class_exists( 'OBLT_Invoicing' ) ) {
+		OBLT_Invoicing::migrate_paid_settings();
+		delete_option( OBLT_Invoicing::highwater_marker_key( OBLT_Plugin::OPT_INVOICE_NEXT ) );
+		delete_option( OBLT_Invoicing::highwater_marker_key( OBLT_Plugin::OPT_CREDIT_NEXT ) );
+	}
+}
 
 add_action(
 	'before_woocommerce_init',

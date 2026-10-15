@@ -1,0 +1,9 @@
+.tp-support-wrap .tp-support-card { background: #fff; border: 1px solid #c3c4c7; border-radius: 4px; padding: 4px 18px 14px; max-width: 760px; }
+.tp-support-ticket label { display: block; font-weight: 600; margin-bottom: 4px; }
+.tp-support-ticket .tp-check label { font-weight: 400; }
+.tp-support-ticket .tp-check input[type="checkbox"] { margin-right: 6px; }
+.tp-support-ticket details { margin: 8px 0 12px; }
+.tp-support-ticket details textarea { margin-top: 6px; font-size: 12px; }
+.tp-support-actions .button, .tp-support-actions .button-link { vertical-align: middle; }
+.tp-support-status.is-ok { color: #1a7f37; font-weight: 600; }
+.tp-support-status.is-error { color: #b32d2e; }

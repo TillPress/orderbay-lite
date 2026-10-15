@@ -14,24 +14,10 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 <head>
 	<meta charset="utf-8" />
 	<title><?php echo esc_html__( 'Credit note', 'orderbay-lite' ); ?></title>
-	<style>
-		@page { size: <?php echo esc_attr( $oblt_paper ); ?>; margin: 12mm; }
-		body { font-family: system-ui, sans-serif; font-size: 12.5px; margin: 16px; color: #111; }
-		.sheet { page-break-after: always; max-width: 190mm; margin: 0 auto 28px; }
-		.sheet:last-child { page-break-after: auto; }
-		h1 { font-size: 20px; margin: 0 0 8px; }
-		.meta { color: #555; margin-bottom: 12px; }
-		table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-		th, td { border-bottom: 1px solid #ddd; padding: 7px 6px; text-align: left; }
-		th { border-bottom: 2px solid #222; }
-		.num { text-align: right; }
-		.totals { margin-top: 12px; text-align: right; font-weight: 700; }
-		.footer { margin-top: 20px; color: #666; font-size: 11px; }
-		@media print { .no-print { display: none !important; } body { margin: 0; } }
-	</style>
+	<?php OBLT_Documents::print_document_assets( 'credit-note', $oblt_paper ); ?>
 </head>
 <body>
-<p class="no-print"><button onclick="window.print()"><?php esc_html_e( 'Print / Save as PDF', 'orderbay-lite' ); ?></button></p>
+<p class="no-print"><button type="button" class="oblt-print-btn"><?php esc_html_e( 'Print / Save as PDF', 'orderbay-lite' ); ?></button></p>
 <?php foreach ( $orders as $oblt_order ) : ?>
 	<?php
 	$oblt_cn     = $oblt_order->get_meta( OBLT_Plugin::META_CREDIT_NUMBER );
@@ -121,5 +107,6 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 		<?php endif; ?>
 	</div>
 <?php endforeach; ?>
+<?php OBLT_Documents::print_document_script(); ?>
 </body>
 </html>

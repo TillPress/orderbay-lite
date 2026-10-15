@@ -1,0 +1,15 @@
+.oblt-hub-grid { display: grid; grid-template-columns: repeat( auto-fit, minmax( 340px, 1fr ) ); gap: 16px; margin-top: 12px; align-items: start; }
+.oblt-hub-card { background: #fff; border: 1px solid #c3c4c7; border-radius: 4px; padding: 4px 18px 14px; }
+.oblt-hub-card h2 { font-size: 1.15em; }
+.oblt-hub-card label { display: block; font-weight: 600; margin-bottom: 4px; }
+.oblt-hub-card label input[type="checkbox"] { margin-right: 6px; }
+.oblt-hub-card details { margin: 8px 0 12px; }
+.oblt-hub-card details textarea { margin-top: 6px; font-size: 12px; }
+.oblt-hub-list { list-style: disc; margin-left: 20px; }
+.oblt-hub-inline { display: inline-block; margin: 0 6px 6px 0; }
+.oblt-hub-actions .button, .oblt-hub-actions form { vertical-align: middle; }
+.oblt-hub-offer { border-left: 4px solid #2271b1; }
+.oblt-hub-code { font-size: 1.1em; padding: 2px 8px; }
+.oblt-ticket-status.is-ok { color: #1a7f37; }
+.oblt-ticket-status.is-error { color: #b32d2e; }
+.oblt-hub-preview { background: #f6f7f7; border: 1px solid #dcdcde; padding: 8px 10px; white-space: pre-wrap; }
