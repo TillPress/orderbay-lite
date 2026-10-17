@@ -4,11 +4,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Invoice print view: browser Print → Save as PDF. Optional Dompdf/TCPDF if present on host.
+ * Invoice print view (browser Print → Save as PDF) and the PDF download, rendered with
+ * the bundled Dompdf (see OBLT_Pdf).
  */
 class OBLT_Documents {
 
 	private static $instance = null;
+
+	/**
+	 * True while a template renders for Dompdf (OBLT_Pdf::document_html()).
+	 *
+	 * @var bool
+	 */
+	public static $pdf_mode = false;
 
 	public static function instance() {
 		if ( is_null( self::$instance ) ) {
@@ -51,9 +59,9 @@ class OBLT_Documents {
 		$paper                 = isset( $input['paper'] ) ? sanitize_key( $input['paper'] ) : 'letter';
 		$out['paper']          = in_array( $paper, array( 'letter', 'a4' ), true ) ? $paper : 'letter';
 		$out['tax_id']         = isset( $input['tax_id'] ) ? sanitize_text_field( $input['tax_id'] ) : '';
+		$out['peppol_id'] = isset( $input['peppol_id'] ) ? sanitize_text_field( $input['peppol_id'] ) : '';
 		$out['seller_country'] = isset( $input['seller_country'] ) ? strtoupper( substr( sanitize_text_field( $input['seller_country'] ), 0, 2 ) ) : '';
-		$engine                = isset( $input['pdf_engine'] ) ? sanitize_key( $input['pdf_engine'] ) : 'browser';
-		$out['pdf_engine']     = in_array( $engine, array( 'browser', 'auto' ), true ) ? $engine : 'browser';
+		$out                   = OBLT_Pdf::sanitize_email_settings( $input, $out );
 		return $out;
 	}
 
@@ -79,6 +87,15 @@ class OBLT_Documents {
 		$css    = is_readable( $file ) ? (string) file_get_contents( $file ) : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local plugin file.
 		$paper  = 'A4' === $paper ? 'A4' : 'letter';
 		$css    = '@page { size: ' . $paper . '; margin: 12mm; }' . "\n" . $css;
+		if ( self::$pdf_mode ) {
+			// Dompdf input, never sent to a browser: inline the CSS plus the no-flexbox
+			// fallbacks. A plain <style> keeps every render in a request styled (a
+			// registered handle prints only once per request).
+			$pdf_css = OBLT_PLUGIN_DIR . 'assets/document-pdf.css';
+			$css    .= "\n" . ( is_readable( $pdf_css ) ? (string) file_get_contents( $pdf_css ) : '' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local plugin file.
+			echo '<style>' . $css . '</style>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- local plugin stylesheet for the PDF renderer.
+			return;
+		}
 		if ( ! wp_style_is( $handle, 'registered' ) ) {
 			wp_register_style( $handle, false, array(), OBLT_VERSION );
 		}
@@ -90,6 +107,9 @@ class OBLT_Documents {
 	 * Print the "Print / Save as PDF" button behaviour (attached to .oblt-print-btn).
 	 */
 	public static function print_document_script() {
+		if ( self::$pdf_mode ) {
+			return;
+		}
 		if ( ! wp_script_is( 'oblt-doc-print', 'registered' ) ) {
 			wp_register_script( 'oblt-doc-print', false, array(), OBLT_VERSION, true );
 			wp_add_inline_script( 'oblt-doc-print', 'document.querySelectorAll(".oblt-print-btn").forEach(function(b){b.addEventListener("click",function(){window.print();});});' );
@@ -98,18 +118,12 @@ class OBLT_Documents {
 	}
 
 	/**
-	 * Whether host has Dompdf or TCPDF available.
+	 * Whether a PDF engine is available: the bundled Dompdf, or a Dompdf already loaded.
 	 *
-	 * @return string|false 'dompdf'|'tcpdf'|false
+	 * @return string|false 'dompdf'|false
 	 */
 	public static function detect_pdf_engine() {
-		if ( class_exists( '\\Dompdf\\Dompdf' ) ) {
-			return 'dompdf';
-		}
-		if ( class_exists( 'TCPDF' ) ) {
-			return 'tcpdf';
-		}
-		return false;
+		return OBLT_Pdf::engine_available() ? 'dompdf' : false;
 	}
 
 	public function render_settings() {
@@ -119,7 +133,7 @@ class OBLT_Documents {
 		$s   = OBLT_Plugin::get_doc_settings();
 		$eng = self::detect_pdf_engine();
 		echo '<div class="wrap"><h1>' . esc_html__( 'OrderBay Lite invoices', 'orderbay-lite' ) . '</h1>';
-		echo '<p class="description">' . esc_html__( 'Primary path: open the invoice print view → browser Print / Save as PDF. No Dompdf/TCPDF bundled.', 'orderbay-lite' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Invoices print from the browser (Print / Save as PDF) and download as PDF files made on your own server by the bundled Dompdf engine. Nothing is sent to an outside service.', 'orderbay-lite' ) . '</p>';
 		echo '<p class="description">' . esc_html__( 'Not tax advice. Invoice layout, numbering, VAT lines, and e-invoice files are tools — confirm legal requirements with your accountant or tax adviser before using them in production.', 'orderbay-lite' ) . '</p>';
 		echo '<form method="post" action="options.php">';
 		settings_fields( 'oblt_documents' );
@@ -138,27 +152,44 @@ class OBLT_Documents {
 		echo '</select></td></tr>';
 		echo '<tr><th><label for="oblt_tax_id">' . esc_html__( 'Company VAT / Tax ID', 'orderbay-lite' ) . '</label></th><td>';
 		echo '<input type="text" id="oblt_tax_id" class="regular-text" name="' . esc_attr( OBLT_Plugin::OPT_DOCS ) . '[tax_id]" value="' . esc_attr( $s['tax_id'] ?? '' ) . '" /></td></tr>';
+		echo '<tr><th><label for="oblt_peppol_id">' . esc_html__( 'Peppol ID', 'orderbay-lite' ) . '</label></th><td>';
+		echo '<input type="text" id="oblt_peppol_id" class="regular-text" name="' . esc_attr( OBLT_Plugin::OPT_DOCS ) . '[peppol_id]" value="' . esc_attr( $s['peppol_id'] ?? '' ) . '" placeholder="0208:0123456789" />';
+		echo '<p class="description">' . esc_html__( 'Scheme and ID, for example 0208:0123456789. Blank = worked out from the VAT number.', 'orderbay-lite' ) . '</p></td></tr>';
 		echo '<tr><th><label for="oblt_seller_country">' . esc_html__( 'Seller country (ISO)', 'orderbay-lite' ) . '</label></th><td>';
 		echo '<input type="text" id="oblt_seller_country" class="small-text" maxlength="2" name="' . esc_attr( OBLT_Plugin::OPT_DOCS ) . '[seller_country]" value="' . esc_attr( $s['seller_country'] ?? '' ) . '" placeholder="' . esc_attr( strtoupper( substr( (string) get_option( 'woocommerce_default_country', '' ), 0, 2 ) ) ) . '" />';
 		echo '<p class="description">' . esc_html__( 'For e-invoicing. Blank = WooCommerce store country.', 'orderbay-lite' ) . '</p></td></tr>';
-		echo '<tr><th>' . esc_html__( 'PDF engine', 'orderbay-lite' ) . '</th><td>';
-		echo '<select name="' . esc_attr( OBLT_Plugin::OPT_DOCS ) . '[pdf_engine]">';
-		echo '<option value="browser"' . selected( $s['pdf_engine'] ?? 'browser', 'browser', false ) . '>' . esc_html__( 'Browser only (Print → Save as PDF)', 'orderbay-lite' ) . '</option>';
-		echo '<option value="auto"' . selected( $s['pdf_engine'] ?? 'browser', 'auto', false ) . '>' . esc_html__( 'Auto: Dompdf/TCPDF if already installed on host', 'orderbay-lite' ) . '</option>';
-		echo '</select>';
+		echo '</table>';
+
+		echo '<h2>' . esc_html__( 'PDF invoices in emails', 'orderbay-lite' ) . '</h2>';
+		echo '<table class="form-table" role="presentation">';
+		echo '<tr><th>' . esc_html__( 'Attach PDF invoice to emails', 'orderbay-lite' ) . '</th><td>';
+		echo '<label><input type="checkbox" name="' . esc_attr( OBLT_Plugin::OPT_DOCS ) . '[email_attach_on]" value="1"' . checked( OBLT_Pdf::attach_enabled( $s ), true, false ) . ' /> ';
+		echo esc_html__( 'Attach the invoice PDF to the WooCommerce emails ticked below', 'orderbay-lite' ) . '</label>';
+		$labels   = array(
+			'customer_processing_order' => __( 'Processing order (customer)', 'orderbay-lite' ),
+			'customer_completed_order'  => __( 'Completed order (customer)', 'orderbay-lite' ),
+			'customer_invoice'          => __( 'Customer invoice / Order details (customer)', 'orderbay-lite' ),
+			'customer_refunded_order'   => __( 'Refunded order (customer): attaches the credit note PDF when the order has a credit note number', 'orderbay-lite' ),
+			'new_order'                 => __( 'New order (admin)', 'orderbay-lite' ),
+		);
+		$selected = OBLT_Pdf::selected_emails( $s );
+		echo '<fieldset style="margin-top:8px;">';
+		foreach ( OBLT_Pdf::OFFERED_EMAILS as $email_id ) {
+			echo '<label style="display:block;margin:2px 0;"><input type="checkbox" name="' . esc_attr( OBLT_Plugin::OPT_DOCS ) . '[email_attach][]" value="' . esc_attr( $email_id ) . '"' . checked( in_array( $email_id, $selected, true ), true, false ) . ' /> ' . esc_html( $labels[ $email_id ] ?? $email_id ) . '</label>';
+		}
+		echo '</fieldset>';
 		echo '<p class="description">';
 		if ( $eng ) {
-			/* translators: %s: detected PDF engine name. */
-			echo esc_html( sprintf( __( 'Detected on this host: %s. Download PDF button appears when engine is Auto.', 'orderbay-lite' ), $eng ) );
+			echo esc_html__( 'The invoice number is assigned when the first PDF is attached, if the order does not have one yet. If a PDF cannot be made, the email is still sent without it and the reason is logged under WooCommerce → Status → Logs (source: orderbay-lite).', 'orderbay-lite' );
 		} else {
-			echo esc_html__( 'No Dompdf/TCPDF detected. OrderBay Lite does not bundle PDF libraries.', 'orderbay-lite' );
+			echo esc_html__( 'PDFs need the PHP mbstring and dom extensions, which this server does not have. Emails are sent without a PDF until they are enabled.', 'orderbay-lite' );
 		}
 		echo '</p></td></tr>';
 		echo '</table>';
 
 		if ( class_exists( 'OBLT_EInvoice' ) ) {
 			echo '<h2>' . esc_html__( 'E-invoicing (UBL / Factur-X)', 'orderbay-lite' ) . '</h2>';
-			echo '<p class="description">' . esc_html__( 'Download UBL (Peppol BIS 3.0) or CII (Factur-X EN16931) invoice XML from the order screen. Export only — OrderBay Lite does not connect to the Peppol network or any PDP/access point. EN16931 baseline: validate against an official validator before relying on it. A "Factur-X PDF" button also appears when a PDF engine (Dompdf/TCPDF) and the horstoeko/zugferd library are installed on the host; its output must pass a Factur-X validator.', 'orderbay-lite' ) . '</p>';
+			echo '<p class="description">' . esc_html__( 'Download UBL (Peppol BIS 3.0) or CII (Factur-X EN16931) invoice XML from the order screen. Export only — OrderBay Lite does not connect to the Peppol network or any PDP/access point. EN16931 baseline: validate against an official validator before relying on it. A "Factur-X PDF" button also appears when the horstoeko/zugferd library is installed on the host (OrderBay Lite does not bundle it); its output must pass a Factur-X validator.', 'orderbay-lite' ) . '</p>';
 			$seller_issues = OBLT_EInvoice::seller_issues( OBLT_EInvoice::seller_data() );
 			if ( $seller_issues ) {
 				echo '<div class="notice notice-warning inline"><p><strong>' . esc_html__( 'Seller details needed for compliant e-invoices:', 'orderbay-lite' ) . '</strong></p><ul style="list-style:disc;margin-left:20px;">';
@@ -181,6 +212,8 @@ class OBLT_Documents {
 		echo '<tr><th>' . esc_html__( 'Next credit #', 'orderbay-lite' ) . '</th><td><input type="number" min="1" name="oblt_credit_next" value="' . esc_attr( (string) max( 1, (int) get_option( OBLT_Plugin::OPT_CREDIT_NEXT, 1 ) ) ) . '" /></td></tr>';
 		$this->numbering_format_rows( __( 'Credit note', 'orderbay-lite' ), OBLT_Plugin::OPT_CREDIT_FORMAT, OBLT_Plugin::OPT_CREDIT_RESET );
 		echo '</table>';
+
+		OBLT_Withdrawal::render_settings_fields();
 
 		submit_button( __( 'Save invoice settings', 'orderbay-lite' ) );
 		echo '</form>';
@@ -332,9 +365,8 @@ class OBLT_Documents {
 		echo '<p class="form-field" style="clear:both;padding-left:0;">';
 		echo '<a class="button button-primary" target="_blank" href="' . esc_url( $this->print_url( $order->get_id() ) ) . '" style="margin:0 4px 4px 0;">' . esc_html__( 'Invoice', 'orderbay-lite' ) . '</a> ';
 		echo '<a class="button" target="_blank" href="' . esc_url( $this->packing_slip_url( $order->get_id() ) ) . '" style="margin:0 4px 4px 0;">' . esc_html__( 'Packing slip', 'orderbay-lite' ) . '</a> ';
-		$s = OBLT_Plugin::get_doc_settings();
-		if ( 'auto' === ( $s['pdf_engine'] ?? 'browser' ) && self::detect_pdf_engine() ) {
-			echo '<a class="button" href="' . esc_url( $this->pdf_url( $order->get_id() ) ) . '">' . esc_html__( 'Download PDF (host engine)', 'orderbay-lite' ) . '</a> ';
+		if ( self::detect_pdf_engine() ) {
+			echo '<a class="button" href="' . esc_url( $this->pdf_url( $order->get_id() ) ) . '" style="margin:0 4px 4px 0;">' . esc_html__( 'Download PDF', 'orderbay-lite' ) . '</a> ';
 		}
 		if ( class_exists( 'OBLT_EInvoice' ) ) {
 			echo '<a class="button" href="' . esc_url( OBLT_EInvoice::download_url( $order->get_id(), 'ubl' ) ) . '">' . esc_html__( 'E-invoice UBL', 'orderbay-lite' ) . '</a> ';
@@ -343,7 +375,6 @@ class OBLT_Documents {
 				echo '<a class="button" href="' . esc_url( OBLT_EInvoice::facturx_url( $order->get_id() ) ) . '">' . esc_html__( 'Factur-X PDF', 'orderbay-lite' ) . '</a> ';
 			}
 		}
-		echo '<span class="description" style="display:block;margin-top:4px;">' . esc_html__( 'PDF: browser Print → Save as PDF (primary). Optional host Dompdf/TCPDF when PDF engine = Auto.', 'orderbay-lite' ) . '</span>';
 		if ( class_exists( 'OBLT_EInvoice' ) ) {
 			$einv_issues = OBLT_EInvoice::compliance_issues( OBLT_EInvoice::order_to_invoice_data( $order ) );
 			if ( $einv_issues ) {
@@ -371,6 +402,14 @@ class OBLT_Documents {
 			esc_attr__( 'Packing slip', 'orderbay-lite' ),
 			esc_html__( 'Slip', 'orderbay-lite' )
 		);
+		if ( self::detect_pdf_engine() ) {
+			printf(
+				'<a class="button wc-action-button" href="%s" title="%s">%s</a> ',
+				esc_url( $this->pdf_url( $order->get_id() ) ),
+				esc_attr__( 'Download PDF invoice', 'orderbay-lite' ),
+				esc_html__( 'PDF', 'orderbay-lite' )
+			);
+		}
 	}
 
 	/**
@@ -455,75 +494,38 @@ class OBLT_Documents {
 	}
 
 	/**
-	 * Render the invoice to PDF bytes using the detected host engine (Dompdf/TCPDF).
-	 * Returns '' when no engine is available. Reused by the Factur-X assembler.
+	 * Invoice PDF bytes (assigns the invoice number first). Returns '' on any failure.
+	 * Reused by the Factur-X assembler.
 	 *
 	 * @param WC_Order $order Order.
 	 * @return string PDF bytes or ''.
 	 */
 	public static function render_pdf_bytes( $order ) {
-		$engine = self::detect_pdf_engine();
-		if ( ! $engine ) {
+		try {
+			return OBLT_Pdf::invoice_bytes( $order );
+		} catch ( Throwable $e ) {
 			return '';
 		}
-		if ( class_exists( 'OBLT_Invoicing' ) ) {
-			$number = OBLT_Invoicing::ensure_invoice_number( $order );
-			if ( '' === (string) $number ) {
-				wp_die( esc_html__( 'An invoice number could not be allocated. The document was not rendered.', 'orderbay-lite' ) );
-			}
-		}
-		$settings = OBLT_Plugin::get_doc_settings();
-		$orders   = array( $order );
-		ob_start();
-		include self::locate_template( 'invoice.php' );
-		$html = (string) ob_get_clean();
-		$html = preg_replace( '/<p class="no-print">.*?<\/p>/s', '', $html );
-
-		if ( 'dompdf' === $engine && class_exists( '\\Dompdf\\Dompdf' ) ) {
-			$dompdf = new \Dompdf\Dompdf();
-			$dompdf->loadHtml( $html );
-			$dompdf->setPaper( ( 'a4' === ( $settings['paper'] ?? 'letter' ) ) ? 'a4' : 'letter' );
-			$dompdf->render();
-			return (string) $dompdf->output();
-		}
-		if ( 'tcpdf' === $engine && class_exists( 'TCPDF' ) ) {
-			$pdf = new TCPDF();
-			$pdf->AddPage();
-			$pdf->writeHTML( $html, true, false, true, false, '' );
-			return (string) $pdf->Output( '', 'S' );
-		}
-		return '';
 	}
 
 	/**
-	 * Optional host PDF stream (Dompdf/TCPDF only if present).
+	 * Staff PDF download (edit_shop_orders + per-order nonce).
 	 */
 	public function handle_pdf_download() {
 		if ( ! current_user_can( 'edit_shop_orders' ) ) {
-			wp_die( esc_html__( 'Forbidden', 'orderbay-lite' ) );
+			wp_die( esc_html__( 'Forbidden', 'orderbay-lite' ), 403 );
 		}
-		$order_id = isset( $_GET['order_id'] ) ? absint( $_GET['order_id'] ) : 0; // phpcs:ignore
+		$order_id = isset( $_GET['order_id'] ) ? absint( $_GET['order_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		check_admin_referer( 'oblt_pdf_' . $order_id );
-		$s = OBLT_Plugin::get_doc_settings();
-		if ( 'auto' !== ( $s['pdf_engine'] ?? 'browser' ) ) {
-			wp_die( esc_html__( 'PDF engine is set to browser-only.', 'orderbay-lite' ) );
-		}
-		$engine = self::detect_pdf_engine();
-		if ( ! $engine ) {
-			wp_die( esc_html__( 'No Dompdf/TCPDF on this host. Use browser Print → Save as PDF.', 'orderbay-lite' ) );
-		}
 		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
 			wp_die( esc_html__( 'Order not found', 'orderbay-lite' ) );
 		}
-		$bytes = self::render_pdf_bytes( $order );
-		if ( '' === $bytes ) {
-			wp_die( esc_html__( 'PDF engine failed.', 'orderbay-lite' ) );
+		try {
+			$bytes = OBLT_Pdf::invoice_bytes( $order );
+		} catch ( Throwable $e ) {
+			wp_die( esc_html__( 'The PDF could not be made:', 'orderbay-lite' ) . ' ' . esc_html( $e->getMessage() ) );
 		}
-		nocache_headers();
-		header( 'Content-Type: application/pdf' );
-		header( 'Content-Disposition: attachment; filename=orderbay-lite-invoice-' . $order_id . '.pdf' );
-		echo $bytes; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- binary PDF.
-		exit;
+		OBLT_Pdf::stream( $bytes, OBLT_Pdf::filename( 'invoice', (string) $order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER ) ) );
 	}
 }

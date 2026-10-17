@@ -1,0 +1,13 @@
+/* OrderBay Lite: PDF-only fallbacks, appended after the document stylesheet when Dompdf renders it. Dompdf has no flexbox or grid, so rows and columns use table layout here. The browser print view never loads this file. */
+body { font-family: "DejaVu Sans", sans-serif; margin: 0; }
+.sheet { max-width: none; margin: 0; page-break-after: auto; }
+.header, .cols { display: table; width: 100%; table-layout: fixed; }
+.header > div, .cols > div { display: table-cell; vertical-align: top; }
+.header > div { width: 50%; }
+.cols > div { width: 50%; padding-right: 16px; }
+.totals { float: right; width: 260px; margin-left: 0; }
+.totals .row { display: table; width: 100%; }
+.totals .row > span { display: table-cell; }
+.totals .row > span + span { text-align: right; white-space: nowrap; }
+.notes, .footer { clear: both; }
+.no-print { display: none; }
