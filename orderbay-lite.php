@@ -2,13 +2,15 @@
 /**
  * Plugin Name:       OrderBay Lite
  * Plugin URI:        https://tillpress.com/orderbay/
- * Description:       Free WooCommerce invoices: printable invoices, sequential invoice numbers, credit notes, customer My Account invoice download, and UBL 2.1 / Factur-X CII e-invoice XML export.
- * Version:           1.1.1
+ * Description:       Free WooCommerce invoices: PDF invoices attached to order emails, printable invoices, sequential invoice numbers, credit notes, customer My Account PDF download, and UBL 2.1 / Factur-X CII e-invoice XML export.
+ * Version:           1.3.0
  * Author:            Tillpress
  * Author URI:        https://tillpress.com
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * WC requires at least: 7.0
+ * WC tested up to:  11.2
+ * Requires Plugins:  woocommerce
  * Text Domain:       orderbay-lite
  * Domain Path:       /languages
  * License:           GPLv2 or later
@@ -19,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'OBLT_VERSION', '1.1.1' );
+define( 'OBLT_VERSION', '1.3.0' );
 define( 'OBLT_BRAND_NAME', 'OrderBay Lite' );
 define( 'OBLT_PLUGIN_FILE', __FILE__ );
 define( 'OBLT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -28,8 +30,10 @@ define( 'OBLT_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
 
 require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-plugin.php';
 require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-documents.php';
+require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-pdf.php';
 require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-invoicing.php';
 require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-einvoice.php';
+require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-withdrawal.php';
 require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-demo.php';
 require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-support.php';
 require_once OBLT_PLUGIN_DIR . 'includes/class-oblt-hub.php';
@@ -60,8 +64,10 @@ function oblt_init() {
 
 	OBLT_Plugin::instance();
 	OBLT_Documents::instance();
+	OBLT_Pdf::instance();
 	OBLT_Invoicing::instance();
 	OBLT_EInvoice::instance();
+	OBLT_Withdrawal::instance();
 	if ( is_admin() ) {
 		OBLT_Support::instance();
 		OBLT_Hub::instance();
@@ -80,6 +86,14 @@ function oblt_activate() {
 		delete_option( OBLT_Invoicing::highwater_marker_key( OBLT_Plugin::OPT_INVOICE_NEXT ) );
 		delete_option( OBLT_Invoicing::highwater_marker_key( OBLT_Plugin::OPT_CREDIT_NEXT ) );
 	}
+}
+
+register_deactivation_hook( __FILE__, 'oblt_deactivate' );
+/**
+ * Stop the hourly sweep of temporary email PDFs.
+ */
+function oblt_deactivate() {
+	wp_clear_scheduled_hook( 'oblt_pdf_tmp_sweep' );
 }
 
 add_action(

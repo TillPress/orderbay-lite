@@ -1300,6 +1300,12 @@ class OBLT_Invoicing {
 			'url'  => self::customer_invoice_url( $order->get_id() ),
 			'name' => __( 'Invoice', 'orderbay-lite' ),
 		);
+		if ( class_exists( 'OBLT_Pdf' ) && OBLT_Pdf::engine_available() ) {
+			$actions['oblt_invoice_pdf'] = array(
+				'url'  => self::customer_invoice_pdf_url( $order->get_id() ),
+				'name' => __( 'Invoice PDF', 'orderbay-lite' ),
+			);
+		}
 		return $actions;
 	}
 
@@ -1310,7 +1316,11 @@ class OBLT_Invoicing {
 		if ( ! is_user_logged_in() || ! $order || ! self::customer_can_view_invoice( $order ) ) {
 			return;
 		}
-		echo '<p class="oblt-account-invoice"><a class="button" target="_blank" href="' . esc_url( self::customer_invoice_url( $order->get_id() ) ) . '">' . esc_html__( 'Download / print invoice', 'orderbay-lite' ) . '</a></p>';
+		echo '<p class="oblt-account-invoice"><a class="button" target="_blank" href="' . esc_url( self::customer_invoice_url( $order->get_id() ) ) . '">' . esc_html__( 'Print invoice', 'orderbay-lite' ) . '</a>';
+		if ( class_exists( 'OBLT_Pdf' ) && OBLT_Pdf::engine_available() ) {
+			echo ' <a class="button" href="' . esc_url( self::customer_invoice_pdf_url( $order->get_id() ) ) . '">' . esc_html__( 'Download PDF', 'orderbay-lite' ) . '</a>';
+		}
+		echo '</p>';
 	}
 
 	/**
@@ -1328,6 +1338,16 @@ class OBLT_Invoicing {
 			),
 			'oblt_customer_invoice_' . absint( $order_id )
 		);
+	}
+
+	/**
+	 * Same URL, nonce and permission check as the print view, streamed as a PDF file.
+	 *
+	 * @param int $order_id Order ID.
+	 * @return string
+	 */
+	public static function customer_invoice_pdf_url( $order_id ) {
+		return add_query_arg( array( 'oblt_pdf' => 1 ), self::customer_invoice_url( $order_id ) );
 	}
 
 	public function handle_customer_invoice() {
@@ -1349,6 +1369,15 @@ class OBLT_Invoicing {
 		$number = self::ensure_invoice_number( $order );
 		if ( '' === (string) $number ) {
 			wp_die( esc_html__( 'Your invoice could not be prepared because a document number could not be allocated. Please try again or contact the store.', 'orderbay-lite' ), 500 );
+		}
+		if ( ! empty( $_GET['oblt_pdf'] ) && class_exists( 'OBLT_Pdf' ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nonce verified above.
+			try {
+				$bytes = OBLT_Pdf::render( $order, 'invoice' );
+			} catch ( Throwable $e ) {
+				wp_die( esc_html__( 'Your invoice PDF could not be prepared. Please use Print invoice instead, or contact the store.', 'orderbay-lite' ), 500 );
+			}
+			OBLT_Pdf::stream( $bytes, OBLT_Pdf::filename( 'invoice', $number ) );
+			return;
 		}
 		$settings = OBLT_Plugin::get_doc_settings();
 		$orders   = array( $order );

@@ -58,13 +58,16 @@ class OBLT_Plugin {
 	 */
 	public static function default_doc_settings() {
 		return array(
-			'logo_url'       => '',
-			'from_lines'     => get_bloginfo( 'name' ) . "\n" . get_option( 'woocommerce_store_address', '' ),
-			'footer_text'    => __( 'Thank you for your order.', 'orderbay-lite' ),
-			'paper'          => 'letter',
-			'tax_id'         => '',
-			'seller_country' => '',
-			'pdf_engine'     => 'browser',
+			'logo_url'        => '',
+			'from_lines'      => get_bloginfo( 'name' ) . "\n" . get_option( 'woocommerce_store_address', '' ),
+			'footer_text'     => __( 'Thank you for your order.', 'orderbay-lite' ),
+			'paper'           => 'letter',
+			'tax_id'          => '',
+			'peppol_id'       => '',
+			'seller_country'  => '',
+			// PDF invoices in emails: on by default for these customer emails.
+			'email_attach_on' => '1',
+			'email_attach'    => array( 'customer_completed_order', 'customer_invoice' ),
 		);
 	}
 

@@ -34,16 +34,45 @@ class OBLT_EInvoice {
 	private function __construct() {
 		add_action( 'admin_post_oblt_einvoice', array( $this, 'handle_download' ) );
 		add_action( 'admin_post_oblt_facturx', array( $this, 'handle_facturx' ) );
+		add_filter( 'woocommerce_admin_billing_fields', array( $this, 'admin_billing_fields' ) );
+	}
+
+	/**
+	 * Add VAT number and Peppol ID to the order screen's billing fields so e-invoices can
+	 * carry the buyer's Peppol address. WooCommerce saves them as _billing_vat and
+	 * _billing_peppol_id. A field another plugin already added is left alone.
+	 *
+	 * @param array $fields Billing fields.
+	 * @return array
+	 */
+	public function admin_billing_fields( $fields ) {
+		if ( ! is_array( $fields ) ) {
+			return $fields;
+		}
+		if ( ! isset( $fields['vat'] ) ) {
+			$fields['vat'] = array(
+				'label' => __( 'VAT number', 'orderbay-lite' ),
+				'show'  => false,
+			);
+		}
+		if ( ! isset( $fields['peppol_id'] ) ) {
+			$fields['peppol_id'] = array(
+				'label'       => __( 'Peppol ID', 'orderbay-lite' ),
+				'show'        => false,
+				'placeholder' => '0208:0123456789',
+			);
+		}
+		return $fields;
 	}
 
 	/**
 	 * Whether a Factur-X PDF can be assembled on this host: a Factur-X/ZUGFeRD library
-	 * (horstoeko/zugferd) AND a base-PDF engine (Dompdf/TCPDF) must both be present.
+	 * (horstoeko/zugferd) must be installed; the base PDF comes from the bundled Dompdf.
 	 *
 	 * @return bool
 	 */
 	public static function facturx_available() {
-		return class_exists( '\\horstoeko\\zugferd\\ZugferdDocumentPdfBuilder' )
+		return class_exists( '\\horstoeko\\zugferd\\ZugferdDocumentPdfMerger' )
 			&& class_exists( 'OBLT_Documents' )
 			&& (bool) OBLT_Documents::detect_pdf_engine();
 	}
@@ -66,9 +95,9 @@ class OBLT_EInvoice {
 	 * Assemble and stream a Factur-X PDF (PDF/A-3 with the embedded CII XML) using an
 	 * optional host library. Only reachable when facturx_available().
 	 *
-	 * NOTE: the integration is written to the documented horstoeko/zugferd API but cannot
-	 * be executed in this environment (no library). The produced PDF must pass a Factur-X /
-	 * ZUGFeRD validator before production use.
+	 * Uses ZugferdDocumentPdfMerger, which takes the CII XML string and the base PDF bytes
+	 * (ZugferdDocumentPdfBuilder takes a ZugferdDocumentBuilder object instead). The produced
+	 * PDF must pass a Factur-X / ZUGFeRD validator before production use.
 	 */
 	public function handle_facturx() {
 		if ( ! current_user_can( 'edit_shop_orders' ) ) {
@@ -78,7 +107,7 @@ class OBLT_EInvoice {
 		check_admin_referer( 'oblt_facturx_' . $order_id );
 
 		if ( ! self::facturx_available() ) {
-			wp_die( esc_html__( 'Factur-X needs a PDF engine (Dompdf/TCPDF) and the horstoeko/zugferd library on this host.', 'orderbay-lite' ) );
+			wp_die( esc_html__( 'Factur-X needs the horstoeko/zugferd library on this host.', 'orderbay-lite' ) );
 		}
 		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
@@ -98,7 +127,7 @@ class OBLT_EInvoice {
 		$xml = self::build_cii( self::order_to_invoice_data( $order ) );
 
 		try {
-			$builder = new \horstoeko\zugferd\ZugferdDocumentPdfBuilder( $xml, $pdf_bytes );
+			$builder = new \horstoeko\zugferd\ZugferdDocumentPdfMerger( $xml, $pdf_bytes );
 			$builder->generateDocument();
 			$name = 'facturx-' . preg_replace( '/[^A-Za-z0-9_-]/', '', (string) $order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER ) ) . '.pdf';
 			if ( method_exists( $builder, 'downloadString' ) ) {
@@ -205,6 +234,127 @@ class OBLT_EInvoice {
 			'country'  => $country,
 			'vat'      => isset( $settings['tax_id'] ) ? (string) $settings['tax_id'] : '',
 			'email'    => (string) get_option( 'woocommerce_email_from_address', get_option( 'admin_email' ) ),
+			'endpoint' => self::peppol_endpoint(
+				isset( $settings['peppol_id'] ) ? (string) $settings['peppol_id'] : '',
+				isset( $settings['tax_id'] ) ? (string) $settings['tax_id'] : '',
+				$country
+			),
+		);
+	}
+
+	/**
+	 * Peppol EAS scheme for a VAT number, keyed by its country prefix (Greece uses EL).
+	 *
+	 * @var array<string,string>
+	 */
+	private static $vat_eas = array(
+		'AD' => '9922',
+		'AL' => '9923',
+		'AT' => '9914',
+		'BA' => '9924',
+		'BG' => '9926',
+		'CH' => '9927',
+		'CY' => '9928',
+		'CZ' => '9929',
+		'DE' => '9930',
+		'EE' => '9931',
+		'EL' => '9933',
+		'ES' => '9920',
+		'FR' => '9957',
+		'GB' => '9932',
+		'GR' => '9933',
+		'HR' => '9934',
+		'HU' => '9910',
+		'IE' => '9935',
+		'IT' => '0211',
+		'LI' => '9936',
+		'LT' => '9937',
+		'LU' => '9938',
+		'LV' => '9939',
+		'MC' => '9940',
+		'ME' => '9941',
+		'MK' => '9942',
+		'MT' => '9943',
+		'NL' => '9944',
+		'PL' => '9945',
+		'PT' => '9946',
+		'RO' => '9947',
+		'RS' => '9948',
+		'SI' => '9949',
+		'SK' => '9950',
+		'SM' => '9951',
+		'TR' => '9952',
+		'VA' => '9953',
+	);
+
+	/**
+	 * A party's Peppol address: the one already worked out, else derived from its VAT number.
+	 *
+	 * @param array $p Party data.
+	 * @return array{scheme:string,id:string}|array{}
+	 */
+	public static function party_endpoint( array $p ) {
+		if ( isset( $p['endpoint'] ) && is_array( $p['endpoint'] ) ) {
+			return ( ! empty( $p['endpoint']['scheme'] ) && ! empty( $p['endpoint']['id'] ) ) ? array(
+				'scheme' => (string) $p['endpoint']['scheme'],
+				'id'     => (string) $p['endpoint']['id'],
+			) : array();
+		}
+		return self::peppol_endpoint( '', isset( $p['vat'] ) ? (string) $p['vat'] : '', isset( $p['country'] ) ? (string) $p['country'] : '' );
+	}
+
+	/**
+	 * Peppol electronic address (BT-34 / BT-49) for a party.
+	 *
+	 * An explicit Peppol ID ("0208:0123456789", optionally prefixed with
+	 * "iso6523-actorid-upis::") wins. Otherwise it is derived from the VAT number:
+	 * Belgian VAT becomes the enterprise number under scheme 0208 (what Belgian
+	 * receivers register), other European VAT numbers use their EAS VAT scheme.
+	 *
+	 * @param string $explicit Peppol ID entered by the merchant or customer.
+	 * @param string $vat      VAT number.
+	 * @param string $country  ISO country code, used when the VAT has no prefix.
+	 * @return array{scheme:string,id:string}|array{} Empty when none can be found.
+	 */
+	public static function peppol_endpoint( $explicit, $vat, $country = '' ) {
+		$explicit = trim( (string) $explicit );
+		if ( '' !== $explicit ) {
+			$explicit = preg_replace( '/^iso6523-actorid-upis::/i', '', $explicit );
+			if ( preg_match( '/^([0-9]{4})\s*:\s*(\S.*)$/', $explicit, $m ) ) {
+				return array(
+					'scheme' => $m[1],
+					'id'     => trim( $m[2] ),
+				);
+			}
+		}
+
+		$vat = strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) $vat ) );
+		if ( '' === $vat ) {
+			return array();
+		}
+		if ( preg_match( '/^[A-Z]{2}/', $vat ) ) {
+			$prefix = substr( $vat, 0, 2 );
+		} else {
+			$prefix = strtoupper( substr( (string) $country, 0, 2 ) );
+			$prefix = 'GR' === $prefix ? 'EL' : $prefix;
+			$vat    = $prefix . $vat;
+		}
+		if ( 'BE' === $prefix ) {
+			$digits = substr( $vat, 2 );
+			if ( 9 === strlen( $digits ) ) {
+				$digits = '0' . $digits;
+			}
+			return preg_match( '/^[0-9]{10}$/', $digits ) ? array(
+				'scheme' => '0208',
+				'id'     => $digits,
+			) : array();
+		}
+		if ( ! isset( self::$vat_eas[ $prefix ] ) ) {
+			return array();
+		}
+		return array(
+			'scheme' => self::$vat_eas[ $prefix ],
+			'id'     => $vat,
 		);
 	}
 
@@ -267,6 +417,9 @@ class OBLT_EInvoice {
 			'vat'      => (string) $order->get_meta( '_billing_vat' ),
 			'email'    => (string) $order->get_billing_email(),
 		);
+		$buyer['endpoint'] = self::peppol_endpoint( (string) $order->get_meta( '_billing_peppol_id' ), $buyer['vat'], $buyer['country'] );
+
+		$buyer_reference = trim( (string) $order->get_meta( '_billing_buyer_reference' ) );
 
 		$date = $order->get_date_created();
 
@@ -277,6 +430,7 @@ class OBLT_EInvoice {
 			'currency'       => (string) $order->get_currency(),
 			'type_code'      => '380',
 			'note'           => (string) $order->get_customer_note(),
+			'buyer_ref'      => '' !== $buyer_reference ? $buyer_reference : (string) $order->get_order_number(),
 			'seller'         => $seller,
 			'buyer'          => $buyer,
 			'lines'          => $lines,
@@ -362,6 +516,8 @@ class OBLT_EInvoice {
 		}
 		if ( empty( $seller['vat'] ) ) {
 			$issues[] = __( 'Seller VAT / Tax ID is missing (set Company VAT / Tax ID in Documents settings).', 'orderbay-lite' );
+		} elseif ( ! self::party_endpoint( $seller ) ) {
+			$issues[] = __( 'Seller Peppol ID is missing and can\'t be worked out from the VAT number (set Peppol ID in Documents settings).', 'orderbay-lite' );
 		}
 		return $issues;
 	}
@@ -380,6 +536,9 @@ class OBLT_EInvoice {
 		}
 		if ( empty( $buyer['country'] ) || 2 !== strlen( (string) $buyer['country'] ) ) {
 			$issues[] = __( 'Buyer country code is missing or invalid.', 'orderbay-lite' );
+		}
+		if ( ! empty( $buyer['vat'] ) && ! self::party_endpoint( $buyer ) ) {
+			$issues[] = __( 'Buyer Peppol ID is missing and can\'t be worked out from their VAT number.', 'orderbay-lite' );
 		}
 		if ( empty( $d['lines'] ) ) {
 			$issues[] = __( 'Invoice has no lines.', 'orderbay-lite' );
@@ -429,6 +588,9 @@ class OBLT_EInvoice {
 			self::el( $doc, $root, 'cbc:Note', (string) $d['note'] );
 		}
 		self::el( $doc, $root, 'cbc:DocumentCurrencyCode', $cur );
+		if ( ! empty( $d['buyer_ref'] ) ) {
+			self::el( $doc, $root, 'cbc:BuyerReference', (string) $d['buyer_ref'] );
+		}
 
 		// Parties.
 		$supplier = self::el( $doc, $root, 'cac:AccountingSupplierParty' );
@@ -487,7 +649,11 @@ class OBLT_EInvoice {
 	 */
 	private static function ubl_party( DOMDocument $doc, DOMElement $parent, array $p ) {
 		$party = self::el( $doc, $parent, 'cac:Party' );
-		$addr  = self::el( $doc, $party, 'cac:PostalAddress' );
+		$endpoint = self::party_endpoint( $p );
+		if ( $endpoint ) {
+			self::el( $doc, $party, 'cbc:EndpointID', $endpoint['id'], array( 'schemeID' => $endpoint['scheme'] ) );
+		}
+		$addr = self::el( $doc, $party, 'cac:PostalAddress' );
 		self::el( $doc, $addr, 'cbc:StreetName', (string) ( $p['street'] ?? '' ) );
 		if ( ! empty( $p['street2'] ) ) {
 			self::el( $doc, $addr, 'cbc:AdditionalStreetName', (string) $p['street2'] );
