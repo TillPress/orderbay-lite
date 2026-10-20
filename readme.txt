@@ -4,7 +4,7 @@ Tags: woocommerce, invoice, credit note, e-invoice, pdf
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 WC requires at least: 7.0
@@ -105,6 +105,9 @@ Delivery notes, shipping labels, proforma invoices, bulk and multi-order packing
 
 
 
+
+= 1.3.1 =
+* New: after OrderBay Lite has invoiced at least 10 real orders and been installed for 14 days, administrators see one notice asking for a WordPress.org review, with a Get help button next to it. "Maybe later" hides it for 30 days, once; "Dismiss" hides it for good. Demo orders are not counted, and nothing is sent anywhere.
 = 1.3.0 =
 * New: EU withdrawal button. Turn it on under WooCommerce → OrderBay Lite to add a "Withdraw from contract here" link to your site footer and My Account, and a withdrawal page. Customers pick the order (and, if they want, the items), then press "Confirm withdrawal here". Signed-in customers confirm straight away; guests confirm through a link sent to the order's email. The customer and the store each get an email with what was submitted and when, and the order gets a note.
 * Fix: UBL e-invoices now pass the Peppol validator. They were missing the seller and buyer Peppol IDs and the buyer reference. The IDs are worked out from VAT numbers (Belgian VAT becomes the 0208 enterprise number) or can be set: a Peppol ID setting for your shop, and VAT number and Peppol ID fields in the order's billing details.

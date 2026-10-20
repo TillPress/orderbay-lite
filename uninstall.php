@@ -20,6 +20,9 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 $oblt_options = array(
 	'oblt_documents_settings',
 	'oblt_withdrawal',
+	'oblt_installed_at',
+	'oblt_review_nudge_dismissed',
+	'oblt_review_nudge_snoozed_until',
 );
 
 foreach ( $oblt_options as $oblt_key ) {
@@ -43,6 +46,7 @@ if ( is_array( $oblt_demo ) ) {
 	}
 }
 delete_option( 'oblt_demo_ids' );
+delete_transient( 'oblt_review_nudge_count' );
 
 // Temporary email PDFs and the PDF font cache (uploads/orderbay-lite-tmp) and their hourly sweep.
 if ( function_exists( 'wp_clear_scheduled_hook' ) ) {
