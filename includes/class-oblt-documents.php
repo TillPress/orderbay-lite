@@ -62,6 +62,7 @@ class OBLT_Documents {
 		$out['peppol_id'] = isset( $input['peppol_id'] ) ? sanitize_text_field( $input['peppol_id'] ) : '';
 		$out['seller_country'] = isset( $input['seller_country'] ) ? strtoupper( substr( sanitize_text_field( $input['seller_country'] ), 0, 2 ) ) : '';
 		$out                   = OBLT_Pdf::sanitize_email_settings( $input, $out );
+		$out                   = OBLT_EInvoice::sanitize_settings( $input, $out );
 		return $out;
 	}
 
@@ -188,8 +189,9 @@ class OBLT_Documents {
 		echo '</table>';
 
 		if ( class_exists( 'OBLT_EInvoice' ) ) {
-			echo '<h2>' . esc_html__( 'E-invoicing (UBL / Factur-X)', 'orderbay-lite' ) . '</h2>';
-			echo '<p class="description">' . esc_html__( 'Download UBL (Peppol BIS 3.0) or CII (Factur-X EN16931) invoice XML from the order screen. Export only — OrderBay Lite does not connect to the Peppol network or any PDP/access point. EN16931 baseline: validate against an official validator before relying on it. A "Factur-X PDF" button also appears when the horstoeko/zugferd library is installed on the host (OrderBay Lite does not bundle it); its output must pass a Factur-X validator.', 'orderbay-lite' ) . '</p>';
+			echo '<h2>' . esc_html__( 'E-invoicing (Factur-X / ZUGFeRD, XRechnung, UBL)', 'orderbay-lite' ) . '</h2>';
+			echo '<p class="description">' . esc_html__( 'The order screen has a Factur-X / ZUGFeRD PDF (a normal-looking PDF/A-3 invoice with the invoice data inside, for France and Germany), XRechnung XML (German public buyers), and UBL (Peppol BIS 3.0) or CII XML. Export only: OrderBay Lite does not connect to the Peppol network or any PDP/access point. Our sample invoices pass the official KoSIT and Mustang validators; check one real order through a validator before relying on it.', 'orderbay-lite' ) . '</p>';
+			OBLT_EInvoice::render_settings_fields( $s );
 			$seller_issues = OBLT_EInvoice::seller_issues( OBLT_EInvoice::seller_data() );
 			if ( $seller_issues ) {
 				echo '<div class="notice notice-warning inline"><p><strong>' . esc_html__( 'Seller details needed for compliant e-invoices:', 'orderbay-lite' ) . '</strong></p><ul style="list-style:disc;margin-left:20px;">';
@@ -369,14 +371,16 @@ class OBLT_Documents {
 			echo '<a class="button" href="' . esc_url( $this->pdf_url( $order->get_id() ) ) . '" style="margin:0 4px 4px 0;">' . esc_html__( 'Download PDF', 'orderbay-lite' ) . '</a> ';
 		}
 		if ( class_exists( 'OBLT_EInvoice' ) ) {
+			if ( OBLT_EInvoice::facturx_available() ) {
+				$fx_label = 'xrechnung' === OBLT_EInvoice::pdf_profile() ? __( 'ZUGFeRD PDF (XRechnung)', 'orderbay-lite' ) : __( 'Factur-X / ZUGFeRD PDF', 'orderbay-lite' );
+				echo '<a class="button" href="' . esc_url( OBLT_EInvoice::facturx_url( $order->get_id() ) ) . '">' . esc_html( $fx_label ) . '</a> ';
+			}
+			echo '<a class="button" href="' . esc_url( OBLT_EInvoice::download_url( $order->get_id(), 'xrechnung' ) ) . '">' . esc_html__( 'XRechnung XML', 'orderbay-lite' ) . '</a> ';
 			echo '<a class="button" href="' . esc_url( OBLT_EInvoice::download_url( $order->get_id(), 'ubl' ) ) . '">' . esc_html__( 'E-invoice UBL', 'orderbay-lite' ) . '</a> ';
 			echo '<a class="button" href="' . esc_url( OBLT_EInvoice::download_url( $order->get_id(), 'cii' ) ) . '">' . esc_html__( 'E-invoice CII (Factur-X)', 'orderbay-lite' ) . '</a> ';
-			if ( OBLT_EInvoice::facturx_available() ) {
-				echo '<a class="button" href="' . esc_url( OBLT_EInvoice::facturx_url( $order->get_id() ) ) . '">' . esc_html__( 'Factur-X PDF', 'orderbay-lite' ) . '</a> ';
-			}
 		}
 		if ( class_exists( 'OBLT_EInvoice' ) ) {
-			$einv_issues = OBLT_EInvoice::compliance_issues( OBLT_EInvoice::order_to_invoice_data( $order ) );
+			$einv_issues = OBLT_EInvoice::compliance_issues( OBLT_EInvoice::order_to_invoice_data( $order ), OBLT_EInvoice::pdf_profile() );
 			if ( $einv_issues ) {
 				echo '<span class="description" style="display:block;margin-top:4px;color:#b32d2e;">';
 				echo esc_html__( 'E-invoice XML is a draft — not fully compliant yet:', 'orderbay-lite' ) . ' ' . esc_html( implode( ' ', $einv_issues ) );
