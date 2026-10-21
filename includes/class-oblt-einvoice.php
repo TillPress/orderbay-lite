@@ -6,21 +6,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * E-invoicing: standards-compliant XML export for an order.
  *
- * Produces UBL 2.1 (Peppol BIS Billing 3.0) and UN/CEFACT CII (Factur-X EN16931 profile)
- * invoice XML. The CII output is the XML a later Factur-X PDF/A-3 embeds.
+ * Produces UBL 2.1 (Peppol BIS Billing 3.0), UN/CEFACT CII (Factur-X / ZUGFeRD EN 16931
+ * profile) and XRechnung 3.0 invoice XML, plus the Factur-X / ZUGFeRD PDF (PDF/A-3b with
+ * the CII embedded, built by OBLT_FacturX on the bundled Dompdf). Export only: OrderBay
+ * Lite does not connect to the Peppol network or any PDP / access point.
  *
- * Scope note: this is an EN16931 *baseline* covering the mandatory core (parties, lines,
- * per-rate tax subtotals, monetary totals). It is NOT yet validated against the official
- * EN16931 Schematron rules, and the Factur-X PDF/A-3 assembly + Peppol transmission are
- * separate follow-ups. Validate a real order's output through an EN16931/Peppol validator
- * before relying on it in production.
+ * The sample invoices in tests/ pass the KoSIT validator (EN 16931 and XRechnung 3.0
+ * schematron) and the Mustang validator (veraPDF PDF/A-3b + Factur-X rules).
+ * Check a real order through a validator once before relying on it.
  *
  * The builders take a normalized data array (not a WC_Order) so they are pure and unit
  * testable without WordPress; order_to_invoice_data() is the thin WooCommerce-facing map.
  */
 class OBLT_EInvoice {
 
-	const FORMATS = array( 'ubl', 'cii' );
+	const FORMATS = array( 'ubl', 'cii', 'xrechnung' );
+
+	/** XRechnung 3.0 specification identifier (BT-24). */
+	const XRECHNUNG_ID = 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
+
+	/** Peppol BIS Billing 3.0 specification identifier (BT-24). */
+	const PEPPOL_ID = 'urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0';
+
+	/** Business process (BT-23) used by Peppol and XRechnung. */
+	const BUSINESS_PROCESS = 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0';
+
+	/** Factur-X PDF profiles: EN 16931 (Factur-X / ZUGFeRD) or XRechnung. */
+	const PDF_PROFILES = array( 'en16931', 'xrechnung' );
 
 	private static $instance = null;
 
@@ -66,15 +78,29 @@ class OBLT_EInvoice {
 	}
 
 	/**
-	 * Whether a Factur-X PDF can be assembled on this host: a Factur-X/ZUGFeRD library
-	 * (horstoeko/zugferd) must be installed; the base PDF comes from the bundled Dompdf.
+	 * Whether a Factur-X / ZUGFeRD PDF can be made here: the Dompdf in use
+	 * (bundled 3.x, or a host copy that is recent enough) can write PDF/A-3 with attachments.
 	 *
 	 * @return bool
 	 */
 	public static function facturx_available() {
-		return class_exists( '\\horstoeko\\zugferd\\ZugferdDocumentPdfMerger' )
-			&& class_exists( 'OBLT_Documents' )
-			&& (bool) OBLT_Documents::detect_pdf_engine();
+		return class_exists( 'OBLT_FacturX' )
+			&& OBLT_FacturX::engine_ready();
+	}
+
+	/**
+	 * The PDF profile picked in Documents settings: 'en16931' (Factur-X / ZUGFeRD) or
+	 * 'xrechnung' (ZUGFeRD with XRechnung XML).
+	 *
+	 * @param array|null $settings Document settings (null = read them).
+	 * @return string
+	 */
+	public static function pdf_profile( $settings = null ) {
+		if ( null === $settings ) {
+			$settings = class_exists( 'OBLT_Plugin' ) ? OBLT_Plugin::get_doc_settings() : array();
+		}
+		$p = isset( $settings['einv_pdf_profile'] ) ? (string) $settings['einv_pdf_profile'] : 'en16931';
+		return in_array( $p, self::PDF_PROFILES, true ) ? $p : 'en16931';
 	}
 
 	/**
@@ -92,12 +118,32 @@ class OBLT_EInvoice {
 	}
 
 	/**
-	 * Assemble and stream a Factur-X PDF (PDF/A-3 with the embedded CII XML) using an
-	 * optional host library. Only reachable when facturx_available().
+	 * Factur-X / ZUGFeRD PDF bytes for an order: the invoice PDF as PDF/A-3b with the CII
+	 * XML embedded. The caller assigns the invoice number first.
 	 *
-	 * Uses ZugferdDocumentPdfMerger, which takes the CII XML string and the base PDF bytes
-	 * (ZugferdDocumentPdfBuilder takes a ZugferdDocumentBuilder object instead). The produced
-	 * PDF must pass a Factur-X / ZUGFeRD validator before production use.
+	 * @param WC_Order    $order   Order.
+	 * @param string|null $profile 'en16931' | 'xrechnung' (null = settings).
+	 * @return string PDF bytes.
+	 * @throws RuntimeException When the PDF cannot be made.
+	 */
+	public static function facturx_bytes( $order, $profile = null ) {
+		$profile = in_array( $profile, self::PDF_PROFILES, true ) ? $profile : self::pdf_profile();
+		if ( ! class_exists( 'OBLT_FacturX' ) || ! OBLT_FacturX::engine_ready() ) {
+			throw new RuntimeException( 'The PDF engine on this site cannot write PDF/A-3 files.' );
+		}
+		$xml   = self::build_cii( self::order_to_invoice_data( $order ), $profile );
+		return OBLT_Pdf::render(
+			$order,
+			'invoice',
+			array(
+				'xml'     => $xml,
+				'profile' => $profile,
+			)
+		);
+	}
+
+	/**
+	 * Stream the Factur-X / ZUGFeRD PDF for an order.
 	 */
 	public function handle_facturx() {
 		if ( ! current_user_can( 'edit_shop_orders' ) ) {
@@ -107,7 +153,7 @@ class OBLT_EInvoice {
 		check_admin_referer( 'oblt_facturx_' . $order_id );
 
 		if ( ! self::facturx_available() ) {
-			wp_die( esc_html__( 'Factur-X needs the horstoeko/zugferd library on this host.', 'orderbay-lite' ) );
+			wp_die( esc_html__( 'Factur-X needs the bundled PDF engine (Dompdf 3). Another plugin loaded an older Dompdf first.', 'orderbay-lite' ) );
 		}
 		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
@@ -119,44 +165,38 @@ class OBLT_EInvoice {
 				wp_die( esc_html__( 'An invoice number could not be allocated. The document was not exported.', 'orderbay-lite' ) );
 			}
 		}
-
-		$pdf_bytes = OBLT_Documents::render_pdf_bytes( $order );
-		if ( '' === $pdf_bytes ) {
-			wp_die( esc_html__( 'Could not render the base invoice PDF.', 'orderbay-lite' ) );
-		}
-		$xml = self::build_cii( self::order_to_invoice_data( $order ) );
-
+		$profile = self::pdf_profile();
 		try {
-			$builder = new \horstoeko\zugferd\ZugferdDocumentPdfMerger( $xml, $pdf_bytes );
-			$builder->generateDocument();
-			$name = 'facturx-' . preg_replace( '/[^A-Za-z0-9_-]/', '', (string) $order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER ) ) . '.pdf';
-			if ( method_exists( $builder, 'downloadString' ) ) {
-				$facturx = (string) $builder->downloadString( $name );
-			} else {
-				$tmp = wp_tempnam( 'facturx' );
-				$builder->saveDocument( $tmp );
-				$facturx = (string) file_get_contents( $tmp );
-				wp_delete_file( $tmp );
-			}
+			$facturx = self::facturx_bytes( $order, $profile );
 		} catch ( \Throwable $e ) {
 			wp_die( esc_html__( 'Factur-X assembly failed: ', 'orderbay-lite' ) . esc_html( $e->getMessage() ) );
 		}
-
-		if ( '' === $facturx ) {
-			wp_die( esc_html__( 'Factur-X assembly produced no output.', 'orderbay-lite' ) );
-		}
+		$name = self::facturx_filename( $profile, (string) $order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER ) );
 		nocache_headers();
 		header( 'Content-Type: application/pdf' );
-		header( 'Content-Disposition: attachment; filename=' . $name );
+		header( 'Content-Disposition: attachment; filename="' . $name . '"' );
+		header( 'X-Content-Type-Options: nosniff' );
 		echo $facturx; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- binary PDF.
 		exit;
+	}
+
+	/**
+	 * Download / attachment name for a Factur-X PDF. Pure.
+	 *
+	 * @param string $profile 'en16931' | 'xrechnung'.
+	 * @param string $number  Invoice number.
+	 * @return string
+	 */
+	public static function facturx_filename( $profile, $number ) {
+		$n = trim( (string) preg_replace( '/[^A-Za-z0-9._-]+/', '-', (string) $number ), '-.' );
+		return ( 'xrechnung' === $profile ? 'zugferd-xrechnung-' : 'facturx-' ) . ( '' !== $n ? $n : 'invoice' ) . '.pdf';
 	}
 
 	/**
 	 * Nonce-protected download URL for a given order + format.
 	 *
 	 * @param int    $order_id Order ID.
-	 * @param string $format   ubl|cii.
+	 * @param string $format   ubl|cii|xrechnung.
 	 * @return string
 	 */
 	public static function download_url( $order_id, $format ) {
@@ -193,7 +233,13 @@ class OBLT_EInvoice {
 		}
 
 		$data = self::order_to_invoice_data( $order );
-		$xml  = ( 'cii' === $format ) ? self::build_cii( $data ) : self::build_ubl( $data );
+		if ( 'cii' === $format ) {
+			$xml = self::build_cii( $data );
+		} elseif ( 'xrechnung' === $format ) {
+			$xml = self::build_ubl( $data, 'xrechnung' );
+		} else {
+			$xml = self::build_ubl( $data );
+		}
 
 		$num  = preg_replace( '/[^A-Za-z0-9_-]/', '', (string) $data['invoice_number'] );
 		$num  = '' !== $num ? $num : (string) $order_id;
@@ -208,7 +254,88 @@ class OBLT_EInvoice {
 	}
 
 	/**
-	 * Seller (supplier) party derived from OrderBay Lite document settings + WooCommerce store
+	 * Sanitize the e-invoicing settings from the Documents form into $out.
+	 *
+	 * @param array $input Raw input.
+	 * @param array $out   Settings being built.
+	 * @return array
+	 */
+	public static function sanitize_settings( $input, $out ) {
+		$input = is_array( $input ) ? $input : array();
+		foreach ( array( 'einv_contact', 'einv_phone', 'einv_account_name' ) as $k ) {
+			$out[ $k ] = isset( $input[ $k ] ) ? sanitize_text_field( wp_unslash( $input[ $k ] ) ) : '';
+		}
+		$out['einv_iban'] = isset( $input['einv_iban'] ) ? strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) $input['einv_iban'] ) ) : '';
+		$out['einv_bic']  = isset( $input['einv_bic'] ) ? strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) $input['einv_bic'] ) ) : '';
+		$days             = isset( $input['einv_due_days'] ) ? trim( (string) $input['einv_due_days'] ) : '14';
+		$out['einv_due_days'] = '' === $days ? '14' : (string) min( 365, max( 0, (int) $days ) );
+		$profile                 = isset( $input['einv_pdf_profile'] ) ? sanitize_key( $input['einv_pdf_profile'] ) : 'en16931';
+		$out['einv_pdf_profile'] = in_array( $profile, self::PDF_PROFILES, true ) ? $profile : 'en16931';
+		$out['einv_email_facturx'] = ! empty( $input['einv_email_facturx'] ) ? '1' : '0';
+		return $out;
+	}
+
+	/**
+	 * IBAN check digits (ISO 13616 mod 97). Pure.
+	 *
+	 * @param string $iban IBAN, spaces allowed.
+	 * @return bool
+	 */
+	public static function valid_iban( $iban ) {
+		$iban = strtoupper( preg_replace( '/\s+/', '', (string) $iban ) );
+		if ( ! preg_match( '/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/', $iban ) ) {
+			return false;
+		}
+		$moved  = substr( $iban, 4 ) . substr( $iban, 0, 4 );
+		$digits = '';
+		foreach ( str_split( $moved ) as $ch ) {
+			$digits .= ctype_alpha( $ch ) ? (string) ( ord( $ch ) - 55 ) : $ch;
+		}
+		$rest = 0;
+		foreach ( str_split( $digits, 7 ) as $chunk ) {
+			$rest = (int) ( $rest . $chunk ) % 97;
+		}
+		return 1 === $rest;
+	}
+
+	/**
+	 * E-invoicing rows for the Documents settings form.
+	 *
+	 * @param array $s Document settings.
+	 */
+	public static function render_settings_fields( array $s ) {
+		$opt  = OBLT_Plugin::OPT_DOCS;
+		$text = static function ( $key, $label, $help = '', $placeholder = '' ) use ( $s, $opt ) {
+			echo '<tr><th><label for="oblt_' . esc_attr( $key ) . '">' . esc_html( $label ) . '</label></th><td>';
+			echo '<input type="text" class="regular-text" id="oblt_' . esc_attr( $key ) . '" name="' . esc_attr( $opt ) . '[' . esc_attr( $key ) . ']" value="' . esc_attr( (string) ( $s[ $key ] ?? '' ) ) . '" placeholder="' . esc_attr( $placeholder ) . '" />';
+			if ( '' !== $help ) {
+				echo '<p class="description">' . esc_html( $help ) . '</p>';
+			}
+			echo '</td></tr>';
+		};
+		echo '<table class="form-table">';
+		$profile = self::pdf_profile( $s );
+		echo '<tr><th><label for="oblt_einv_pdf_profile">' . esc_html__( 'Factur-X / ZUGFeRD PDF profile', 'orderbay-lite' ) . '</label></th><td>';
+		echo '<select id="oblt_einv_pdf_profile" name="' . esc_attr( $opt ) . '[einv_pdf_profile]">';
+		echo '<option value="en16931"' . selected( $profile, 'en16931', false ) . '>' . esc_html__( 'EN 16931 (Factur-X / ZUGFeRD, most buyers)', 'orderbay-lite' ) . '</option>';
+		echo '<option value="xrechnung"' . selected( $profile, 'xrechnung', false ) . '>' . esc_html__( 'XRechnung (German public sector)', 'orderbay-lite' ) . '</option>';
+		echo '</select></td></tr>';
+		echo '<tr><th>' . esc_html__( 'Emailed invoices', 'orderbay-lite' ) . '</th><td><label><input type="checkbox" name="' . esc_attr( $opt ) . '[einv_email_facturx]" value="1"' . checked( '1', (string) ( $s['einv_email_facturx'] ?? '0' ), false ) . ' /> ';
+		echo esc_html__( 'Attach the Factur-X / ZUGFeRD PDF instead of the plain invoice PDF', 'orderbay-lite' ) . '</label>';
+		echo '<p class="description">' . esc_html__( 'Customers see the same invoice; their accounting software can read the data inside it.', 'orderbay-lite' ) . '</p></td></tr>';
+		$text( 'einv_contact', __( 'Invoice contact name', 'orderbay-lite' ), __( 'Shown as the seller contact. Leave empty to use the company name.', 'orderbay-lite' ) );
+		$text( 'einv_phone', __( 'Invoice contact phone', 'orderbay-lite' ), __( 'Required for XRechnung.', 'orderbay-lite' ), '+49 30 1234567' );
+		$text( 'einv_iban', __( 'IBAN for bank transfer', 'orderbay-lite' ), __( 'Optional. When set, unpaid invoices ask for a SEPA transfer to this account.', 'orderbay-lite' ) );
+		$text( 'einv_bic', __( 'BIC', 'orderbay-lite' ) );
+		$text( 'einv_account_name', __( 'Account holder', 'orderbay-lite' ) );
+		echo '<tr><th><label for="oblt_einv_due_days">' . esc_html__( 'Payment due after (days)', 'orderbay-lite' ) . '</label></th><td>';
+		echo '<input type="number" min="0" max="365" class="small-text" id="oblt_einv_due_days" name="' . esc_attr( $opt ) . '[einv_due_days]" value="' . esc_attr( (string) ( $s['einv_due_days'] ?? '14' ) ) . '" />';
+		echo '<p class="description">' . esc_html__( 'For orders not paid yet. Paid orders show the payment and nothing due.', 'orderbay-lite' ) . '</p></td></tr>';
+		echo '</table>';
+	}
+
+	/**
+	 * Seller (supplier) party derived from OrderBay document settings + WooCommerce store
 	 * settings. Shared by the order mapper and the settings readiness checklist.
 	 *
 	 * @return array
@@ -234,6 +361,9 @@ class OBLT_EInvoice {
 			'country'  => $country,
 			'vat'      => isset( $settings['tax_id'] ) ? (string) $settings['tax_id'] : '',
 			'email'    => (string) get_option( 'woocommerce_email_from_address', get_option( 'admin_email' ) ),
+			'contact'  => isset( $settings['einv_contact'] ) ? (string) $settings['einv_contact'] : '',
+			'phone'    => isset( $settings['einv_phone'] ) ? (string) $settings['einv_phone'] : '',
+			'iban'     => isset( $settings['einv_iban'] ) ? (string) $settings['einv_iban'] : '',
 			'endpoint' => self::peppol_endpoint(
 				isset( $settings['peppol_id'] ) ? (string) $settings['peppol_id'] : '',
 				isset( $settings['tax_id'] ) ? (string) $settings['tax_id'] : '',
@@ -400,12 +530,11 @@ class OBLT_EInvoice {
 		$tax_total     = round( $tax_total, 2 );
 		$tax_inclusive = round( $line_extension + $tax_total, 2 );
 		$payable       = round( (float) $order->get_total(), 2 );
-		$prepaid       = round( $tax_inclusive - $payable, 2 );
-		$prepaid       = $prepaid > 0 ? $prepaid : 0.0;
 
-		$buyer_name = trim( (string) $order->get_formatted_billing_full_name() );
+		// The company is the legal buyer on a business invoice (BT-44); else the person.
+		$buyer_name = trim( (string) $order->get_billing_company() );
 		if ( '' === $buyer_name ) {
-			$buyer_name = (string) $order->get_billing_company();
+			$buyer_name = trim( (string) $order->get_formatted_billing_full_name() );
 		}
 		$buyer = array(
 			'name'     => $buyer_name,
@@ -421,12 +550,36 @@ class OBLT_EInvoice {
 
 		$buyer_reference = trim( (string) $order->get_meta( '_billing_buyer_reference' ) );
 
-		$date = $order->get_date_created();
+		$date       = $order->get_date_created();
+		$issue_date = $date ? $date->date( 'Y-m-d' ) : gmdate( 'Y-m-d' );
+		$settings   = class_exists( 'OBLT_Plugin' ) ? OBLT_Plugin::get_doc_settings() : array();
+
+		// A paid order shows its payment as prepaid, so the buyer does not pay twice.
+		$paid      = method_exists( $order, 'is_paid' ) && $order->is_paid();
+		$paid_on   = method_exists( $order, 'get_date_paid' ) ? $order->get_date_paid() : null;
+		$done_on   = method_exists( $order, 'get_date_completed' ) ? $order->get_date_completed() : null;
+		$method    = method_exists( $order, 'get_payment_method_title' ) ? (string) $order->get_payment_method_title() : '';
+		$money     = self::amounts_due( $tax_inclusive, $payable, $paid );
+		$due_days  = isset( $settings['einv_due_days'] ) && '' !== (string) $settings['einv_due_days'] ? max( 0, (int) $settings['einv_due_days'] ) : 14;
+		$due_date  = ( ! $paid && $money['payable'] > 0 ) ? gmdate( 'Y-m-d', (int) strtotime( $issue_date . ' +' . $due_days . ' days' ) ) : '';
+		if ( $paid ) {
+			$terms = $paid_on
+				/* translators: 1: payment date, 2: payment method */
+				? sprintf( __( 'Paid on %1$s (%2$s).', 'orderbay-lite' ), $paid_on->date( 'Y-m-d' ), '' !== $method ? $method : __( 'online', 'orderbay-lite' ) )
+				: __( 'Paid.', 'orderbay-lite' );
+		} else {
+			/* translators: %s: due date */
+			$terms = '' !== $due_date ? sprintf( __( 'Payment due by %s.', 'orderbay-lite' ), $due_date ) : '';
+		}
+		$delivered = $done_on ? $done_on : ( $paid_on ? $paid_on : $date );
 
 		return array(
 			'invoice_number' => (string) ( $order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER ) ? $order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER ) : $order->get_order_number() ),
-			'issue_date'     => $date ? $date->date( 'Y-m-d' ) : gmdate( 'Y-m-d' ),
-			'due_date'       => '',
+			'issue_date'     => $issue_date,
+			'due_date'       => $due_date,
+			'delivery_date'  => $delivered ? $delivered->date( 'Y-m-d' ) : $issue_date,
+			'payment_terms'  => $terms,
+			'payment'        => self::payment_means( $settings, $method ),
 			'currency'       => (string) $order->get_currency(),
 			'type_code'      => '380',
 			'note'           => (string) $order->get_customer_note(),
@@ -440,9 +593,59 @@ class OBLT_EInvoice {
 				'tax_exclusive'  => $line_extension,
 				'tax_total'      => $tax_total,
 				'tax_inclusive'  => $tax_inclusive,
-				'payable'        => $payable,
-				'prepaid'        => $prepaid,
+				'payable'        => $money['payable'],
+				'prepaid'        => $money['prepaid'],
+				'rounding'       => $money['rounding'],
 			),
+		);
+	}
+
+	/**
+	 * Prepaid (BT-113), rounding (BT-114) and amount due (BT-115) so that
+	 * due = tax inclusive - prepaid + rounding (BR-CO-16). Pure.
+	 *
+	 * @param float $tax_inclusive Invoice total with VAT worked out from the lines.
+	 * @param float $order_total   What WooCommerce charged.
+	 * @param bool  $paid          Whether the order is already paid.
+	 * @return array{payable:float,prepaid:float,rounding:float}
+	 */
+	public static function amounts_due( $tax_inclusive, $order_total, $paid ) {
+		$tax_inclusive = round( (float) $tax_inclusive, 2 );
+		$order_total   = round( (float) $order_total, 2 );
+		$diff          = round( $order_total - $tax_inclusive, 2 );
+		$rounding      = ( $diff > 0 && $diff <= 0.05 ) ? $diff : 0.0;
+		if ( $paid ) {
+			return array(
+				'payable'  => 0.0,
+				'prepaid'  => round( $tax_inclusive + $rounding, 2 ),
+				'rounding' => $rounding,
+			);
+		}
+		$prepaid = round( $tax_inclusive + $rounding - $order_total, 2 );
+		return array(
+			'payable'  => $order_total,
+			'prepaid'  => $prepaid > 0 ? $prepaid : 0.0,
+			'rounding' => $rounding,
+		);
+	}
+
+	/**
+	 * Payment instructions (BG-16): SEPA credit transfer when an IBAN is set, otherwise
+	 * "instrument not defined" with the WooCommerce payment method as text. Pure.
+	 *
+	 * @param array  $settings Document settings.
+	 * @param string $method   Payment method title.
+	 * @return array{code:string,info:string,iban:string,bic:string,account_name:string}
+	 */
+	public static function payment_means( array $settings, $method = '' ) {
+		$iban = strtoupper( preg_replace( '/\s+/', '', (string) ( $settings['einv_iban'] ?? '' ) ) );
+		$bic  = strtoupper( preg_replace( '/\s+/', '', (string) ( $settings['einv_bic'] ?? '' ) ) );
+		return array(
+			'code'         => '' !== $iban ? '58' : '1',
+			'info'         => '' !== $iban ? __( 'SEPA credit transfer', 'orderbay-lite' ) : (string) $method,
+			'iban'         => $iban,
+			'bic'          => $bic,
+			'account_name' => (string) ( $settings['einv_account_name'] ?? '' ),
 		);
 	}
 
@@ -519,14 +722,18 @@ class OBLT_EInvoice {
 		} elseif ( ! self::party_endpoint( $seller ) ) {
 			$issues[] = __( 'Seller Peppol ID is missing and can\'t be worked out from the VAT number (set Peppol ID in Documents settings).', 'orderbay-lite' );
 		}
+		if ( ! empty( $seller['iban'] ) && ! self::valid_iban( $seller['iban'] ) ) {
+			$issues[] = __( 'The IBAN in Documents settings is not valid.', 'orderbay-lite' );
+		}
 		return $issues;
 	}
 
 	/**
-	 * @param array $d Normalized invoice data.
+	 * @param array  $d       Normalized invoice data.
+	 * @param string $profile '' (EN 16931 / Peppol) or 'xrechnung' for the extra German rules.
 	 * @return string[]
 	 */
-	public static function compliance_issues( array $d ) {
+	public static function compliance_issues( array $d, $profile = '' ) {
 		$seller = isset( $d['seller'] ) && is_array( $d['seller'] ) ? $d['seller'] : array();
 		$buyer  = isset( $d['buyer'] ) && is_array( $d['buyer'] ) ? $d['buyer'] : array();
 		$issues = self::seller_issues( $seller );
@@ -543,6 +750,9 @@ class OBLT_EInvoice {
 		if ( empty( $d['lines'] ) ) {
 			$issues[] = __( 'Invoice has no lines.', 'orderbay-lite' );
 		}
+		if ( 'xrechnung' === $profile ) {
+			$issues = array_merge( $issues, self::xrechnung_issues( $d ) );
+		}
 
 		// Totals must reconcile: line extension + tax total = tax inclusive.
 		$t = isset( $d['totals'] ) && is_array( $d['totals'] ) ? $d['totals'] : array();
@@ -555,13 +765,70 @@ class OBLT_EInvoice {
 		return $issues;
 	}
 
+	/**
+	 * XRechnung 3.0 rules on top of EN 16931 (BR-DE-*), for what the merchant can fix.
+	 *
+	 * @param array $d Normalized invoice data.
+	 * @return string[]
+	 */
+	public static function xrechnung_issues( array $d ) {
+		$seller = isset( $d['seller'] ) && is_array( $d['seller'] ) ? $d['seller'] : array();
+		$buyer  = isset( $d['buyer'] ) && is_array( $d['buyer'] ) ? $d['buyer'] : array();
+		$issues = array();
+		if ( empty( $seller['phone'] ) ) {
+			$issues[] = __( 'XRechnung needs a seller contact phone number (set it under E-invoicing in Documents settings).', 'orderbay-lite' );
+		}
+		if ( empty( $seller['email'] ) ) {
+			$issues[] = __( 'XRechnung needs a seller contact email (the WooCommerce "From" address).', 'orderbay-lite' );
+		}
+		if ( empty( $buyer['city'] ) || empty( $buyer['postcode'] ) ) {
+			$issues[] = __( 'XRechnung needs the buyer\'s city and postcode.', 'orderbay-lite' );
+		}
+		if ( ! self::electronic_address( $buyer, true ) ) {
+			$issues[] = __( 'XRechnung needs the buyer\'s email or Peppol ID.', 'orderbay-lite' );
+		}
+		if ( empty( $d['buyer_ref'] ) ) {
+			$issues[] = __( 'XRechnung needs a buyer reference (Leitweg-ID for public buyers).', 'orderbay-lite' );
+		}
+		$pay = isset( $d['payment'] ) && is_array( $d['payment'] ) ? $d['payment'] : array();
+		if ( '58' === ( $pay['code'] ?? '' ) && empty( $pay['iban'] ) ) {
+			$issues[] = __( 'SEPA credit transfer needs an IBAN.', 'orderbay-lite' );
+		}
+		return $issues;
+	}
+
+	/**
+	 * A party's electronic address (BT-34 / BT-49): its Peppol ID, else (when allowed)
+	 * its email under scheme EM.
+	 *
+	 * @param array $p           Party data.
+	 * @param bool  $allow_email Fall back to the email address.
+	 * @return array{scheme:string,id:string}|array{}
+	 */
+	public static function electronic_address( array $p, $allow_email ) {
+		$endpoint = self::party_endpoint( $p );
+		if ( $endpoint ) {
+			return $endpoint;
+		}
+		$email = isset( $p['email'] ) ? trim( (string) $p['email'] ) : '';
+		if ( $allow_email && '' !== $email && false !== strpos( $email, '@' ) ) {
+			return array(
+				'scheme' => 'EM',
+				'id'     => $email,
+			);
+		}
+		return array();
+	}
+
 	/* ─── UBL 2.1 (Peppol BIS Billing 3.0) ─────────────────────────────── */
 
 	/**
-	 * @param array $d Normalized invoice data.
+	 * @param array  $d       Normalized invoice data.
+	 * @param string $profile 'peppol' (Peppol BIS Billing 3.0) or 'xrechnung' (XRechnung 3.0).
 	 * @return string UBL 2.1 Invoice XML.
 	 */
-	public static function build_ubl( array $d ) {
+	public static function build_ubl( array $d, $profile = 'peppol' ) {
+		$xr                = ( 'xrechnung' === $profile );
 		$doc               = new DOMDocument( '1.0', 'UTF-8' );
 		$doc->formatOutput = true;
 
@@ -575,9 +842,10 @@ class OBLT_EInvoice {
 		$doc->appendChild( $root );
 
 		$cur = (string) $d['currency'];
+		$t   = $d['totals'];
 
-		self::el( $doc, $root, 'cbc:CustomizationID', 'urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0' );
-		self::el( $doc, $root, 'cbc:ProfileID', 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0' );
+		self::el( $doc, $root, 'cbc:CustomizationID', $xr ? self::XRECHNUNG_ID : self::PEPPOL_ID );
+		self::el( $doc, $root, 'cbc:ProfileID', self::BUSINESS_PROCESS );
 		self::el( $doc, $root, 'cbc:ID', (string) $d['invoice_number'] );
 		self::el( $doc, $root, 'cbc:IssueDate', (string) $d['issue_date'] );
 		if ( ! empty( $d['due_date'] ) ) {
@@ -594,13 +862,41 @@ class OBLT_EInvoice {
 
 		// Parties.
 		$supplier = self::el( $doc, $root, 'cac:AccountingSupplierParty' );
-		self::ubl_party( $doc, $supplier, $d['seller'] );
+		self::ubl_party( $doc, $supplier, $d['seller'], $xr, true );
 		$customer = self::el( $doc, $root, 'cac:AccountingCustomerParty' );
-		self::ubl_party( $doc, $customer, $d['buyer'] );
+		self::ubl_party( $doc, $customer, $d['buyer'], $xr, false );
+
+		if ( ! empty( $d['delivery_date'] ) ) {
+			$delivery = self::el( $doc, $root, 'cac:Delivery' );
+			self::el( $doc, $delivery, 'cbc:ActualDeliveryDate', (string) $d['delivery_date'] );
+		}
+
+		$pay = isset( $d['payment'] ) && is_array( $d['payment'] ) ? $d['payment'] : array();
+		if ( ! empty( $pay['code'] ) ) {
+			$pm    = self::el( $doc, $root, 'cac:PaymentMeans' );
+			$attrs = '' !== (string) ( $pay['info'] ?? '' ) ? array( 'name' => (string) $pay['info'] ) : array();
+			self::el( $doc, $pm, 'cbc:PaymentMeansCode', (string) $pay['code'], $attrs );
+			self::el( $doc, $pm, 'cbc:PaymentID', (string) $d['invoice_number'] );
+			if ( ! empty( $pay['iban'] ) ) {
+				$acct = self::el( $doc, $pm, 'cac:PayeeFinancialAccount' );
+				self::el( $doc, $acct, 'cbc:ID', (string) $pay['iban'] );
+				if ( ! empty( $pay['account_name'] ) ) {
+					self::el( $doc, $acct, 'cbc:Name', (string) $pay['account_name'] );
+				}
+				if ( ! empty( $pay['bic'] ) ) {
+					$branch = self::el( $doc, $acct, 'cac:FinancialInstitutionBranch' );
+					self::el( $doc, $branch, 'cbc:ID', (string) $pay['bic'] );
+				}
+			}
+		}
+		if ( ! empty( $d['payment_terms'] ) ) {
+			$terms = self::el( $doc, $root, 'cac:PaymentTerms' );
+			self::el( $doc, $terms, 'cbc:Note', (string) $d['payment_terms'] );
+		}
 
 		// Tax total.
 		$tax_total = self::el( $doc, $root, 'cac:TaxTotal' );
-		self::el( $doc, $tax_total, 'cbc:TaxAmount', self::money( $d['totals']['tax_total'] ), array( 'currencyID' => $cur ) );
+		self::el( $doc, $tax_total, 'cbc:TaxAmount', self::money( $t['tax_total'] ), array( 'currencyID' => $cur ) );
 		foreach ( $d['tax_subtotals'] as $g ) {
 			$sub = self::el( $doc, $tax_total, 'cac:TaxSubtotal' );
 			self::el( $doc, $sub, 'cbc:TaxableAmount', self::money( $g['taxable'] ), array( 'currencyID' => $cur ) );
@@ -614,13 +910,16 @@ class OBLT_EInvoice {
 
 		// Monetary totals.
 		$mon = self::el( $doc, $root, 'cac:LegalMonetaryTotal' );
-		self::el( $doc, $mon, 'cbc:LineExtensionAmount', self::money( $d['totals']['line_extension'] ), array( 'currencyID' => $cur ) );
-		self::el( $doc, $mon, 'cbc:TaxExclusiveAmount', self::money( $d['totals']['tax_exclusive'] ), array( 'currencyID' => $cur ) );
-		self::el( $doc, $mon, 'cbc:TaxInclusiveAmount', self::money( $d['totals']['tax_inclusive'] ), array( 'currencyID' => $cur ) );
-		if ( (float) $d['totals']['prepaid'] > 0 ) {
-			self::el( $doc, $mon, 'cbc:PrepaidAmount', self::money( $d['totals']['prepaid'] ), array( 'currencyID' => $cur ) );
+		self::el( $doc, $mon, 'cbc:LineExtensionAmount', self::money( $t['line_extension'] ), array( 'currencyID' => $cur ) );
+		self::el( $doc, $mon, 'cbc:TaxExclusiveAmount', self::money( $t['tax_exclusive'] ), array( 'currencyID' => $cur ) );
+		self::el( $doc, $mon, 'cbc:TaxInclusiveAmount', self::money( $t['tax_inclusive'] ), array( 'currencyID' => $cur ) );
+		if ( (float) $t['prepaid'] > 0 ) {
+			self::el( $doc, $mon, 'cbc:PrepaidAmount', self::money( $t['prepaid'] ), array( 'currencyID' => $cur ) );
 		}
-		self::el( $doc, $mon, 'cbc:PayableAmount', self::money( $d['totals']['payable'] ), array( 'currencyID' => $cur ) );
+		if ( (float) ( $t['rounding'] ?? 0 ) > 0 ) {
+			self::el( $doc, $mon, 'cbc:PayableRoundingAmount', self::money( $t['rounding'] ), array( 'currencyID' => $cur ) );
+		}
+		self::el( $doc, $mon, 'cbc:PayableAmount', self::money( $t['payable'] ), array( 'currencyID' => $cur ) );
 
 		// Lines.
 		foreach ( $d['lines'] as $ln ) {
@@ -643,13 +942,15 @@ class OBLT_EInvoice {
 	}
 
 	/**
-	 * @param DOMDocument $doc    Document.
-	 * @param DOMElement  $parent AccountingSupplierParty / AccountingCustomerParty.
-	 * @param array       $p      Party data.
+	 * @param DOMDocument $doc         Document.
+	 * @param DOMElement  $parent      AccountingSupplierParty / AccountingCustomerParty.
+	 * @param array       $p           Party data.
+	 * @param bool        $allow_email Use the email as the electronic address when there is no Peppol ID.
+	 * @param bool        $is_seller   Seller party (gets the contact group).
 	 */
-	private static function ubl_party( DOMDocument $doc, DOMElement $parent, array $p ) {
-		$party = self::el( $doc, $parent, 'cac:Party' );
-		$endpoint = self::party_endpoint( $p );
+	private static function ubl_party( DOMDocument $doc, DOMElement $parent, array $p, $allow_email = false, $is_seller = false ) {
+		$party    = self::el( $doc, $parent, 'cac:Party' );
+		$endpoint = self::electronic_address( $p, $allow_email );
 		if ( $endpoint ) {
 			self::el( $doc, $party, 'cbc:EndpointID', $endpoint['id'], array( 'schemeID' => $endpoint['scheme'] ) );
 		}
@@ -671,15 +972,49 @@ class OBLT_EInvoice {
 		}
 		$legal = self::el( $doc, $party, 'cac:PartyLegalEntity' );
 		self::el( $doc, $legal, 'cbc:RegistrationName', (string) ( $p['name'] ?? '' ) );
+
+		$contact = $is_seller ? self::seller_contact( $p ) : array();
+		if ( $contact ) {
+			$c = self::el( $doc, $party, 'cac:Contact' );
+			self::el( $doc, $c, 'cbc:Name', $contact['name'] );
+			if ( '' !== $contact['phone'] ) {
+				self::el( $doc, $c, 'cbc:Telephone', $contact['phone'] );
+			}
+			if ( '' !== $contact['email'] ) {
+				self::el( $doc, $c, 'cbc:ElectronicMail', $contact['email'] );
+			}
+		}
 	}
 
-	/* ─── UN/CEFACT CII (Factur-X EN16931 profile) ─────────────────────── */
+	/**
+	 * Seller contact (BG-6), or empty when there is no phone or email to give.
+	 *
+	 * @param array $p Seller party data.
+	 * @return array{name:string,phone:string,email:string}|array{}
+	 */
+	private static function seller_contact( array $p ) {
+		$phone = trim( (string) ( $p['phone'] ?? '' ) );
+		$email = trim( (string) ( $p['email'] ?? '' ) );
+		if ( '' === $phone && '' === $email ) {
+			return array();
+		}
+		$name = trim( (string) ( $p['contact'] ?? '' ) );
+		return array(
+			'name'  => '' !== $name ? $name : (string) ( $p['name'] ?? '' ),
+			'phone' => $phone,
+			'email' => $email,
+		);
+	}
+
+	/* ─── UN/CEFACT CII (Factur-X / ZUGFeRD, EN 16931 or XRechnung) ────── */
 
 	/**
-	 * @param array $d Normalized invoice data.
+	 * @param array  $d       Normalized invoice data.
+	 * @param string $profile 'en16931' (Factur-X / ZUGFeRD EN 16931) or 'xrechnung'.
 	 * @return string CII XML.
 	 */
-	public static function build_cii( array $d ) {
+	public static function build_cii( array $d, $profile = 'en16931' ) {
+		$xr                = ( 'xrechnung' === $profile );
 		$doc               = new DOMDocument( '1.0', 'UTF-8' );
 		$doc->formatOutput = true;
 
@@ -693,17 +1028,22 @@ class OBLT_EInvoice {
 		$doc->appendChild( $root );
 
 		$cur = (string) $d['currency'];
+		$t   = $d['totals'];
 
-		// Context: EN16931 guideline.
-		$ctx  = self::el( $doc, $root, 'rsm:ExchangedDocumentContext' );
-		$gcp  = self::el( $doc, $ctx, 'ram:GuidelineSpecifiedDocumentContextParameter' );
-		self::el( $doc, $gcp, 'ram:ID', 'urn:cen.eu:en16931:2017' );
+		// Context: business process + specification (EN 16931 or XRechnung).
+		$ctx = self::el( $doc, $root, 'rsm:ExchangedDocumentContext' );
+		if ( $xr ) {
+			$bp = self::el( $doc, $ctx, 'ram:BusinessProcessSpecifiedDocumentContextParameter' );
+			self::el( $doc, $bp, 'ram:ID', self::BUSINESS_PROCESS );
+		}
+		$gcp = self::el( $doc, $ctx, 'ram:GuidelineSpecifiedDocumentContextParameter' );
+		self::el( $doc, $gcp, 'ram:ID', $xr ? self::XRECHNUNG_ID : 'urn:cen.eu:en16931:2017' );
 
 		// Header document.
 		$hdr = self::el( $doc, $root, 'rsm:ExchangedDocument' );
 		self::el( $doc, $hdr, 'ram:ID', (string) $d['invoice_number'] );
 		self::el( $doc, $hdr, 'ram:TypeCode', (string) $d['type_code'] );
-		$dt  = self::el( $doc, $hdr, 'ram:IssueDateTime' );
+		$dt = self::el( $doc, $hdr, 'ram:IssueDateTime' );
 		self::el( $doc, $dt, 'udt:DateTimeString', str_replace( '-', '', (string) $d['issue_date'] ), array( 'format' => '102' ) );
 		if ( ! empty( $d['note'] ) ) {
 			$note = self::el( $doc, $hdr, 'ram:IncludedNote' );
@@ -733,47 +1073,103 @@ class OBLT_EInvoice {
 			self::el( $doc, $sum, 'ram:LineTotalAmount', self::money( $ln['line_net'] ) );
 		}
 
-		// Header trade agreement (parties).
+		// Header trade agreement (buyer reference, parties).
 		$hta = self::el( $doc, $tx, 'ram:ApplicableHeaderTradeAgreement' );
+		if ( ! empty( $d['buyer_ref'] ) ) {
+			self::el( $doc, $hta, 'ram:BuyerReference', (string) $d['buyer_ref'] );
+		}
 		self::cii_party( $doc, $hta, 'ram:SellerTradeParty', $d['seller'] );
 		self::cii_party( $doc, $hta, 'ram:BuyerTradeParty', $d['buyer'] );
 
-		// Delivery (required element, may be empty).
-		self::el( $doc, $tx, 'ram:ApplicableHeaderTradeDelivery' );
+		// Delivery: the actual delivery date (BT-72) when known.
+		$htd = self::el( $doc, $tx, 'ram:ApplicableHeaderTradeDelivery' );
+		if ( ! empty( $d['delivery_date'] ) ) {
+			$ev  = self::el( $doc, $htd, 'ram:ActualDeliverySupplyChainEvent' );
+			$odt = self::el( $doc, $ev, 'ram:OccurrenceDateTime' );
+			self::el( $doc, $odt, 'udt:DateTimeString', str_replace( '-', '', (string) $d['delivery_date'] ), array( 'format' => '102' ) );
+		}
 
 		// Settlement.
 		$hts = self::el( $doc, $tx, 'ram:ApplicableHeaderTradeSettlement' );
+		$pay = isset( $d['payment'] ) && is_array( $d['payment'] ) ? $d['payment'] : array();
+		if ( ! empty( $pay['code'] ) ) {
+			self::el( $doc, $hts, 'ram:PaymentReference', (string) $d['invoice_number'] );
+		}
 		self::el( $doc, $hts, 'ram:InvoiceCurrencyCode', $cur );
+		if ( ! empty( $pay['code'] ) ) {
+			$pm = self::el( $doc, $hts, 'ram:SpecifiedTradeSettlementPaymentMeans' );
+			self::el( $doc, $pm, 'ram:TypeCode', (string) $pay['code'] );
+			if ( '' !== (string) ( $pay['info'] ?? '' ) ) {
+				self::el( $doc, $pm, 'ram:Information', (string) $pay['info'] );
+			}
+			if ( ! empty( $pay['iban'] ) ) {
+				$acct = self::el( $doc, $pm, 'ram:PayeePartyCreditorFinancialAccount' );
+				self::el( $doc, $acct, 'ram:IBANID', (string) $pay['iban'] );
+				if ( ! empty( $pay['account_name'] ) ) {
+					self::el( $doc, $acct, 'ram:AccountName', (string) $pay['account_name'] );
+				}
+				if ( ! empty( $pay['bic'] ) ) {
+					$inst = self::el( $doc, $pm, 'ram:PayeeSpecifiedCreditorFinancialInstitution' );
+					self::el( $doc, $inst, 'ram:BICID', (string) $pay['bic'] );
+				}
+			}
+		}
 		foreach ( $d['tax_subtotals'] as $g ) {
-			$t = self::el( $doc, $hts, 'ram:ApplicableTradeTax' );
-			self::el( $doc, $t, 'ram:CalculatedAmount', self::money( $g['tax'] ) );
-			self::el( $doc, $t, 'ram:TypeCode', 'VAT' );
-			self::el( $doc, $t, 'ram:BasisAmount', self::money( $g['taxable'] ) );
-			self::el( $doc, $t, 'ram:CategoryCode', (string) $g['category'] );
-			self::el( $doc, $t, 'ram:RateApplicablePercent', self::money( $g['percent'] ) );
+			$tax = self::el( $doc, $hts, 'ram:ApplicableTradeTax' );
+			self::el( $doc, $tax, 'ram:CalculatedAmount', self::money( $g['tax'] ) );
+			self::el( $doc, $tax, 'ram:TypeCode', 'VAT' );
+			self::el( $doc, $tax, 'ram:BasisAmount', self::money( $g['taxable'] ) );
+			self::el( $doc, $tax, 'ram:CategoryCode', (string) $g['category'] );
+			self::el( $doc, $tax, 'ram:RateApplicablePercent', self::money( $g['percent'] ) );
+		}
+		if ( ! empty( $d['payment_terms'] ) || ! empty( $d['due_date'] ) ) {
+			$terms = self::el( $doc, $hts, 'ram:SpecifiedTradePaymentTerms' );
+			if ( ! empty( $d['payment_terms'] ) ) {
+				self::el( $doc, $terms, 'ram:Description', (string) $d['payment_terms'] );
+			}
+			if ( ! empty( $d['due_date'] ) ) {
+				$due = self::el( $doc, $terms, 'ram:DueDateDateTime' );
+				self::el( $doc, $due, 'udt:DateTimeString', str_replace( '-', '', (string) $d['due_date'] ), array( 'format' => '102' ) );
+			}
 		}
 		$mon = self::el( $doc, $hts, 'ram:SpecifiedTradeSettlementHeaderMonetarySummation' );
-		self::el( $doc, $mon, 'ram:LineTotalAmount', self::money( $d['totals']['line_extension'] ) );
-		self::el( $doc, $mon, 'ram:TaxBasisTotalAmount', self::money( $d['totals']['tax_exclusive'] ) );
-		self::el( $doc, $mon, 'ram:TaxTotalAmount', self::money( $d['totals']['tax_total'] ), array( 'currencyID' => $cur ) );
-		self::el( $doc, $mon, 'ram:GrandTotalAmount', self::money( $d['totals']['tax_inclusive'] ) );
-		if ( (float) $d['totals']['prepaid'] > 0 ) {
-			self::el( $doc, $mon, 'ram:TotalPrepaidAmount', self::money( $d['totals']['prepaid'] ) );
+		self::el( $doc, $mon, 'ram:LineTotalAmount', self::money( $t['line_extension'] ) );
+		self::el( $doc, $mon, 'ram:TaxBasisTotalAmount', self::money( $t['tax_exclusive'] ) );
+		self::el( $doc, $mon, 'ram:TaxTotalAmount', self::money( $t['tax_total'] ), array( 'currencyID' => $cur ) );
+		if ( (float) ( $t['rounding'] ?? 0 ) > 0 ) {
+			self::el( $doc, $mon, 'ram:RoundingAmount', self::money( $t['rounding'] ) );
 		}
-		self::el( $doc, $mon, 'ram:DuePayableAmount', self::money( $d['totals']['payable'] ) );
+		self::el( $doc, $mon, 'ram:GrandTotalAmount', self::money( $t['tax_inclusive'] ) );
+		if ( (float) $t['prepaid'] > 0 ) {
+			self::el( $doc, $mon, 'ram:TotalPrepaidAmount', self::money( $t['prepaid'] ) );
+		}
+		self::el( $doc, $mon, 'ram:DuePayableAmount', self::money( $t['payable'] ) );
 
 		return (string) $doc->saveXML();
 	}
 
 	/**
-	 * @param DOMDocument $doc  Document.
+	 * @param DOMDocument $doc    Document.
 	 * @param DOMElement  $parent Header trade agreement.
-	 * @param string      $tag  ram:SellerTradeParty|ram:BuyerTradeParty.
-	 * @param array       $p    Party data.
+	 * @param string      $tag    ram:SellerTradeParty|ram:BuyerTradeParty.
+	 * @param array       $p      Party data.
 	 */
 	private static function cii_party( DOMDocument $doc, DOMElement $parent, $tag, array $p ) {
 		$party = self::el( $doc, $parent, $tag );
 		self::el( $doc, $party, 'ram:Name', (string) ( $p['name'] ?? '' ) );
+		$contact = ( 'ram:SellerTradeParty' === $tag ) ? self::seller_contact( $p ) : array();
+		if ( $contact ) {
+			$c = self::el( $doc, $party, 'ram:DefinedTradeContact' );
+			self::el( $doc, $c, 'ram:PersonName', $contact['name'] );
+			if ( '' !== $contact['phone'] ) {
+				$tel = self::el( $doc, $c, 'ram:TelephoneUniversalCommunication' );
+				self::el( $doc, $tel, 'ram:CompleteNumber', $contact['phone'] );
+			}
+			if ( '' !== $contact['email'] ) {
+				$mail = self::el( $doc, $c, 'ram:EmailURIUniversalCommunication' );
+				self::el( $doc, $mail, 'ram:URIID', $contact['email'] );
+			}
+		}
 		$addr = self::el( $doc, $party, 'ram:PostalTradeAddress' );
 		self::el( $doc, $addr, 'ram:PostcodeCode', (string) ( $p['postcode'] ?? '' ) );
 		self::el( $doc, $addr, 'ram:LineOne', (string) ( $p['street'] ?? '' ) );
@@ -782,6 +1178,11 @@ class OBLT_EInvoice {
 		}
 		self::el( $doc, $addr, 'ram:CityName', (string) ( $p['city'] ?? '' ) );
 		self::el( $doc, $addr, 'ram:CountryID', (string) ( $p['country'] ?? '' ) );
+		$uri = self::electronic_address( $p, true );
+		if ( $uri ) {
+			$u = self::el( $doc, $party, 'ram:URIUniversalCommunication' );
+			self::el( $doc, $u, 'ram:URIID', $uri['id'], array( 'schemeID' => $uri['scheme'] ) );
+		}
 		if ( ! empty( $p['vat'] ) ) {
 			$reg = self::el( $doc, $party, 'ram:SpecifiedTaxRegistration' );
 			self::el( $doc, $reg, 'ram:ID', (string) $p['vat'], array( 'schemeID' => 'VA' ) );

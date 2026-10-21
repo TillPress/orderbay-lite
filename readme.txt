@@ -4,12 +4,12 @@ Tags: woocommerce, invoice, credit note, e-invoice, pdf
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.1
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 WC requires at least: 7.0
 
-Free WooCommerce PDF invoices in order emails, sequential numbering, credit notes, packing slips, and UBL / Factur-X e-invoice XML.
+Free WooCommerce PDF invoices, sequential numbering, credit notes, packing slips, and Factur-X / ZUGFeRD, XRechnung and UBL e-invoices.
 
 == Description ==
 
@@ -21,13 +21,15 @@ OrderBay Lite adds the invoicing tools a WooCommerce store legally needs — fre
 * Credit note numbers and a printable credit note for refunded orders
 * Packing slips: a price-free print view with items, SKUs, quantities, variation details, ship-to address, and customer note
 * Customers can download the PDF or print their own invoice from My Account (owner-only, nonce-protected)
-* E-invoice XML export: UBL 2.1 (Peppol BIS Billing 3.0) and UN/CEFACT CII (Factur-X EN16931 profile), with a seller-details readiness checklist. The UBL carries the seller's and buyer's Peppol IDs, worked out from their VAT numbers or entered by hand
+* Factur-X / ZUGFeRD PDF invoices (PDF/A-3 with the invoice data inside), made on your own server, for download or attached to emails
+* XRechnung 3.0 for German public-sector buyers, as XML or as a ZUGFeRD PDF
+* E-invoice XML export: UBL 2.1 (Peppol BIS Billing 3.0) and UN/CEFACT CII (Factur-X EN 16931), with a seller-details readiness checklist. The UBL carries the seller's and buyer's Peppol IDs, worked out from their VAT numbers or entered by hand
 * EU withdrawal button: a "Withdraw from contract here" link and page, a confirmation step, and emailed acknowledgements, as EU consumer law has required since 19 June 2026 (off until you turn it on)
 * Invoice numbers are immutable once assigned and survive plugin updates
 * Compatible with WooCommerce HPOS and block checkout
 * Help & demo page: one-click demo order with invoice, credit note, UBL, and CII, and a support ticket form
 
-Not tax advice: invoice layout, numbering, VAT lines, and e-invoice files are tools — confirm legal requirements with your accountant or tax adviser. The e-invoice XML is an EN16931 baseline export; validate it with an official validator before relying on it, and note that OrderBay Lite does not transmit anything to the Peppol network.
+Not tax advice: invoice layout, numbering, VAT lines, and e-invoice files are tools — confirm legal requirements with your accountant or tax adviser. Sample invoices pass the official KoSIT and Mustang validators; check one of your own orders through a validator before relying on it, and note that OrderBay Lite does not transmit anything to the Peppol network.
 
 = Bundled libraries =
 
@@ -68,7 +70,7 @@ The first time an invoice is printed, downloaded as a PDF, or attached to an ema
 Yes. Logged-in customers get "Invoice" and "Invoice PDF" buttons on My Account → Orders, and "Print invoice" and "Download PDF" on the order view page. Only the customer account that placed the order (or store staff) can open them; guest orders are not reachable from My Account.
 
 = What e-invoice formats are supported? =
-UBL 2.1 (Peppol BIS Billing 3.0) and UN/CEFACT CII (the XML a Factur-X PDF embeds), both EN16931-baseline. Export only — validate with an official EN16931/Peppol validator before production use. A Factur-X PDF button additionally appears if your host has the horstoeko/zugferd library installed; OrderBay Lite does not bundle it.
+Factur-X / ZUGFeRD PDF (EN 16931 profile, or the XRechnung profile), XRechnung 3.0 XML, UBL 2.1 (Peppol BIS Billing 3.0) and UN/CEFACT CII. The PDF is a PDF/A-3b file made by the bundled PDF engine, nothing extra to install. Export only: OrderBay Lite does not send anything to the Peppol network. Check one of your own orders through an official validator before relying on it.
 
 = Does it generate PDFs? =
 Yes. OrderBay Lite bundles the Dompdf PDF engine, so the Download PDF buttons and email attachments work on any host with the PHP mbstring and dom extensions (standard on almost every host). Nothing else needs installing, and the PDF is made on your own server; nothing is sent to an outside service. The browser Print → Save as PDF view is still there.
@@ -98,7 +100,7 @@ Delivery notes, shipping labels, proforma invoices, bulk and multi-order packing
 
 1. Invoice print view — browser Print / Save as PDF.
 2. Settings: business details, logo, VAT / Tax ID, and invoice number format with tokens and yearly/monthly reset.
-3. Order screen buttons: Invoice, E-invoice UBL, E-invoice CII (Factur-X).
+3. Order screen buttons: Invoice, Factur-X / ZUGFeRD PDF, XRechnung, UBL and CII.
 4. Customer My Account invoice download.
 
 == Changelog ==
@@ -106,6 +108,13 @@ Delivery notes, shipping labels, proforma invoices, bulk and multi-order packing
 
 
 
+
+= 1.4.0 =
+* New: Factur-X / ZUGFeRD PDF invoices. A new button on the order screen downloads the invoice as a PDF/A-3 file with the invoice data inside, the format French and German buyers' accounting software reads. It is made on your own server with the bundled PDF engine; nothing extra to install. You can also attach it to emails instead of the plain PDF.
+* New: XRechnung 3.0 for German public-sector buyers, as XML or as a ZUGFeRD PDF with the XRechnung profile. The buyer reference (Leitweg-ID) comes from the order's buyer reference field.
+* New: invoice contact name and phone, IBAN, BIC, account holder and payment terms under E-invoicing settings.
+* Fix: e-invoices now pass the EN 16931 rules for unpaid orders (they had no due date or payment terms). Paid orders now show the payment as prepaid with nothing due, so the buyer does not pay twice. Business buyers are named by their company.
+* Checked: sample paid and unpaid orders pass the KoSIT validator (EN 16931 and XRechnung 3.0.2) and the Mustang validator (PDF/A-3b and Factur-X).
 = 1.3.1 =
 * New: after OrderBay Lite has invoiced at least 10 real orders and been installed for 14 days, administrators see one notice asking for a WordPress.org review, with a Get help button next to it. "Maybe later" hides it for 30 days, once; "Dismiss" hides it for good. Demo orders are not counted, and nothing is sent anywhere.
 = 1.3.0 =
@@ -160,6 +169,9 @@ Delivery notes, shipping labels, proforma invoices, bulk and multi-order packing
 * First public release: printable invoices, sequential invoice numbering with format tokens and counter reset, credit notes, customer My Account invoice download, UBL 2.1 + Factur-X CII e-invoice XML export.
 
 == Upgrade Notice ==
+
+= 1.4.0 =
+Adds Factur-X / ZUGFeRD PDF invoices and XRechnung, and fixes e-invoices for unpaid orders so they pass EN 16931.
 
 = 1.3.0 =
 Adds an optional EU withdrawal button and fixes UBL e-invoices so they pass the Peppol validator.

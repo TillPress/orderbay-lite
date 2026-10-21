@@ -68,6 +68,15 @@ class OBLT_Plugin {
 			// PDF invoices in emails: on by default for these customer emails.
 			'email_attach_on' => '1',
 			'email_attach'    => array( 'customer_completed_order', 'customer_invoice' ),
+			// E-invoicing (Factur-X / ZUGFeRD, XRechnung).
+			'einv_contact'       => '',
+			'einv_phone'         => '',
+			'einv_iban'          => '',
+			'einv_bic'           => '',
+			'einv_account_name'  => '',
+			'einv_due_days'      => '14',
+			'einv_pdf_profile'   => 'en16931',
+			'einv_email_facturx' => '0',
 		);
 	}
 

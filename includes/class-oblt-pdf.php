@@ -210,6 +210,14 @@ class OBLT_Pdf {
 			self::log( 'error', sprintf( 'Order #%s: no invoice number could be allocated, so the invoice PDF was not attached.', $order->get_id() ) );
 			return '';
 		}
+		$s = OBLT_Plugin::get_doc_settings();
+		if ( '1' === (string) ( $s['einv_email_facturx'] ?? '0' ) && class_exists( 'OBLT_EInvoice' ) && OBLT_EInvoice::facturx_available() ) {
+			try {
+				return $this->write_temp( OBLT_EInvoice::facturx_bytes( $order ), self::filename( 'invoice', $number ) );
+			} catch ( Throwable $e ) {
+				self::log( 'warning', sprintf( 'Order #%1$s: the Factur-X PDF failed, so the plain invoice PDF was attached: %2$s', $order->get_id(), $e->getMessage() ) );
+			}
+		}
 		return $this->write_temp( self::render( $order, 'invoice' ), self::filename( 'invoice', $number ) );
 	}
 
@@ -291,20 +299,27 @@ class OBLT_Pdf {
 	/**
 	 * Render a document template to PDF bytes. Throws on any failure.
 	 *
-	 * @param WC_Order $order Order.
-	 * @param string   $doc   'invoice' | 'credit-note'.
+	 * With $facturx (keys xml, profile) the PDF is written as PDF/A-3b with the XML embedded
+	 * (Factur-X / ZUGFeRD).
+	 *
+	 * @param WC_Order $order   Order.
+	 * @param string   $doc     'invoice' | 'credit-note'.
+	 * @param array    $facturx Optional Factur-X data: xml, profile.
 	 * @return string
 	 * @throws RuntimeException When rendering fails.
 	 */
-	public static function render( $order, $doc ) {
+	public static function render( $order, $doc, $facturx = array() ) {
 		if ( is_callable( self::$test_render ) ) {
-			$bytes = (string) call_user_func( self::$test_render, $order, $doc );
+			$bytes = (string) call_user_func( self::$test_render, $order, $doc, $facturx );
 		} else {
 			if ( ! self::load_engine() ) {
 				throw new RuntimeException( 'No PDF engine is available (needs the PHP mbstring and dom extensions).' );
 			}
+			if ( ! empty( $facturx['xml'] ) && ! OBLT_FacturX::engine_ready() ) {
+				throw new RuntimeException( 'The PDF engine on this site cannot write PDF/A-3 files.' );
+			}
 			$settings = OBLT_Plugin::get_doc_settings();
-			$bytes    = self::html_to_pdf( self::document_html( $order, $doc, $settings ), $settings );
+			$bytes    = self::html_to_pdf( self::document_html( $order, $doc, $settings ), $settings, $facturx );
 		}
 		if ( 0 !== strpos( $bytes, '%PDF' ) ) {
 			throw new RuntimeException( 'The PDF engine returned no PDF.' );
@@ -342,17 +357,37 @@ class OBLT_Pdf {
 	 *
 	 * @param string $html     Document HTML.
 	 * @param array  $settings Document settings (paper).
+	 * @param array  $facturx  Optional Factur-X data: xml, profile (PDF/A-3b with the XML).
 	 * @return string
 	 */
-	public static function html_to_pdf( $html, $settings ) {
-		$html   = preg_replace( '/<p class="no-print">.*?<\/p>/s', '', (string) $html );
-		$html   = preg_replace( '#<script\b[^>]*>.*?</script>#is', '', (string) $html );
-		$html   = self::inline_local_images( (string) $html );
-		$dompdf = new \Dompdf\Dompdf( self::dompdf_options() );
-		$dompdf->loadHtml( $html, 'UTF-8' );
-		$dompdf->setPaper( ( 'a4' === ( $settings['paper'] ?? 'letter' ) ) ? 'a4' : 'letter' );
-		$dompdf->render();
-		return (string) $dompdf->output();
+	public static function html_to_pdf( $html, $settings, $facturx = array() ) {
+		$html  = preg_replace( '/<p class="no-print">.*?<\/p>/s', '', (string) $html );
+		$html  = preg_replace( '#<script\b[^>]*>.*?</script>#is', '', (string) $html );
+		$html  = self::inline_local_images( (string) $html );
+		$paper = ( 'a4' === ( $settings['paper'] ?? 'letter' ) ) ? 'a4' : 'letter';
+		if ( empty( $facturx['xml'] ) ) {
+			$dompdf = new \Dompdf\Dompdf( self::dompdf_options() );
+			$dompdf->loadHtml( $html, 'UTF-8' );
+			$dompdf->setPaper( $paper );
+			$dompdf->render();
+			return (string) $dompdf->output();
+		}
+		$options                  = self::dompdf_options();
+		$options['isPdfAEnabled'] = true;
+		$html                     = OBLT_FacturX::pdfa_html( $html );
+		try {
+			$dompdf = new \Dompdf\Dompdf( $options );
+			$dompdf->loadHtml( $html, 'UTF-8' );
+			$dompdf->setPaper( $paper );
+			$dompdf->render();
+		} catch ( Throwable $e ) {
+			// PDF/A refuses some images (CMYK JPEG): try once more without images.
+			$dompdf = new \Dompdf\Dompdf( $options );
+			$dompdf->loadHtml( OBLT_FacturX::strip_images( $html ), 'UTF-8' );
+			$dompdf->setPaper( $paper );
+			$dompdf->render();
+		}
+		return OBLT_FacturX::finish( $dompdf, (string) $facturx['xml'], (string) ( $facturx['profile'] ?? 'en16931' ) );
 	}
 
 	/**
