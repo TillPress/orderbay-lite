@@ -1,6 +1,6 @@
 === OrderBay Lite ===
 Contributors: alextechgamer
-Tags: woocommerce, invoice, credit note, e-invoice, pdf
+Tags: woocommerce, invoice, xrechnung, zugferd, e-invoice
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
@@ -94,7 +94,7 @@ Only on its own Help & demo page: one box describing the paid OrderBay plugin wi
 Lite steps aside automatically so you do not get duplicate buttons or a second number sequence. You can deactivate Lite.
 
 = What does the paid OrderBay add? =
-Delivery notes, shipping labels, proforma invoices, bulk and multi-order packing slips, pick lists, bulk document printing, barcodes and QR codes, custom branding options, a fulfillment desk, and more — at https://tillpress.com/orderbay/.
+Peppol sending through your own Recommand account, delivery notes, shipping labels, proforma invoices, bulk and multi-order packing slips, pick lists, bulk document printing, barcodes and QR codes, custom branding options, a fulfillment desk, CSV tracking import, and more — at https://tillpress.com/orderbay/.
 
 == Screenshots ==
 
