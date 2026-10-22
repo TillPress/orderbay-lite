@@ -4,7 +4,7 @@ Tags: woocommerce, invoice, xrechnung, zugferd, e-invoice
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.5.0
+Stable tag: 1.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 WC requires at least: 7.0
@@ -111,6 +111,10 @@ Peppol sending through your own Recommand account, delivery notes, shipping labe
 
 
 
+
+= 1.6.0 =
+* New: customers can print or download their credit note as a PDF from My Account (Orders list and the order page) once the store has issued one. Customers never cause a new number.
+* German: new strings translated.
 = 1.5.0 =
 * New: tax-free sales to EU businesses. When WooCommerce charges 0% to an EU business with a VAT ID, the invoice and e-invoice say intra-community supply (K, VATEX-EU-IC) with the delivery address, or reverse charge (AE) if you sell services; deliveries outside the EU are exports (G). An issued invoice keeps its category.
 * New: optional checkout fields for the buyer's VAT ID and buyer reference / Leitweg-ID, in the classic and block checkout. Off by default. The VAT ID format is checked.

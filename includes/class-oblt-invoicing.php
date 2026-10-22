@@ -1356,7 +1356,47 @@ class OBLT_Invoicing {
 				'name' => __( 'Invoice PDF', 'orderbay-lite' ),
 			);
 		}
+		// The order page lists the credit note links under the order table already.
+		$on_order_page = function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( 'view-order' );
+		if ( ! $on_order_page && '' !== self::issued_credit_number( $order ) ) {
+			$pdf                         = class_exists( 'OBLT_Pdf' ) && OBLT_Pdf::engine_available();
+			$actions['oblt_credit_note'] = array(
+				'url'  => $pdf ? self::customer_credit_pdf_url( $order->get_id() ) : self::customer_credit_url( $order->get_id() ),
+				'name' => __( 'Credit note', 'orderbay-lite' ),
+			);
+		}
 		return $actions;
+	}
+
+	/**
+	 * The credit note number the store already issued for this order ('' when none).
+	 * Customers can download a credit note but never cause a new number.
+	 *
+	 * @param WC_Order $order Order.
+	 * @return string
+	 */
+	public static function issued_credit_number( $order ) {
+		if ( ! $order instanceof WC_Order ) {
+			return '';
+		}
+		$cn = (string) $order->get_meta( OBLT_Plugin::META_CREDIT_NUMBER );
+		return '' !== $cn ? $cn : (string) $order->get_meta( '_ob_credit_note_number' );
+	}
+
+	/**
+	 * @param int $order_id Order ID.
+	 * @return string
+	 */
+	public static function customer_credit_url( $order_id ) {
+		return add_query_arg( array( 'oblt_doc' => 'credit-note' ), self::customer_invoice_url( $order_id ) );
+	}
+
+	/**
+	 * @param int $order_id Order ID.
+	 * @return string
+	 */
+	public static function customer_credit_pdf_url( $order_id ) {
+		return add_query_arg( array( 'oblt_pdf' => 1 ), self::customer_credit_url( $order_id ) );
 	}
 
 	/**
@@ -1371,6 +1411,15 @@ class OBLT_Invoicing {
 			echo ' <a class="button" href="' . esc_url( self::customer_invoice_pdf_url( $order->get_id() ) ) . '">' . esc_html__( 'Download PDF', 'orderbay-lite' ) . '</a>';
 		}
 		echo '</p>';
+		$cn = self::issued_credit_number( $order );
+		if ( '' !== $cn ) {
+			/* translators: %s: credit note number. */
+			echo '<p class="oblt-account-credit-note"><a class="button" target="_blank" href="' . esc_url( self::customer_credit_url( $order->get_id() ) ) . '">' . esc_html( sprintf( __( 'Print credit note %s', 'orderbay-lite' ), $cn ) ) . '</a>';
+			if ( class_exists( 'OBLT_Pdf' ) && OBLT_Pdf::engine_available() ) {
+				echo ' <a class="button" href="' . esc_url( self::customer_credit_pdf_url( $order->get_id() ) ) . '">' . esc_html__( 'Download credit note PDF', 'orderbay-lite' ) . '</a>';
+			}
+			echo '</p>';
+		}
 	}
 
 	/**
@@ -1416,6 +1465,10 @@ class OBLT_Invoicing {
 		if ( ! $order || ! self::customer_can_view_invoice( $order ) ) {
 			wp_die( esc_html__( 'You cannot view this invoice.', 'orderbay-lite' ), 403 );
 		}
+		if ( isset( $_GET['oblt_doc'] ) && 'credit-note' === $_GET['oblt_doc'] ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nonce verified above.
+			$this->serve_customer_credit_note( $order );
+			return;
+		}
 		$number = self::ensure_invoice_number( $order );
 		if ( '' === (string) $number ) {
 			wp_die( esc_html__( 'Your invoice could not be prepared because a document number could not be allocated. Please try again or contact the store.', 'orderbay-lite' ), 500 );
@@ -1432,6 +1485,34 @@ class OBLT_Invoicing {
 		$settings = OBLT_Plugin::get_doc_settings();
 		$orders   = array( $order );
 		include OBLT_Documents::locate_template( 'invoice.php' );
+		exit;
+	}
+	/**
+	 * Customer credit note (print view or PDF). Only for an order that already has a
+	 * credit note number: the existing number is adopted, nothing new is allocated.
+	 *
+	 * @param WC_Order $order Order the customer owns (checked by the caller).
+	 */
+	private function serve_customer_credit_note( $order ) {
+		if ( '' === self::issued_credit_number( $order ) ) {
+			wp_die( esc_html__( 'This order has no credit note.', 'orderbay-lite' ), 404 );
+		}
+		$number = self::ensure_credit_number( $order );
+		if ( '' === (string) $number ) {
+			wp_die( esc_html__( 'Your credit note could not be prepared. Please try again or contact the store.', 'orderbay-lite' ), 500 );
+		}
+		if ( ! empty( $_GET['oblt_pdf'] ) && class_exists( 'OBLT_Pdf' ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nonce verified by the caller.
+			try {
+				$bytes = OBLT_Pdf::render( $order, 'credit-note' );
+			} catch ( Throwable $e ) {
+				wp_die( esc_html__( 'Your credit note PDF could not be prepared. Please use Print credit note instead, or contact the store.', 'orderbay-lite' ), 500 );
+			}
+			OBLT_Pdf::stream( $bytes, OBLT_Pdf::filename( 'credit-note', $number ) );
+			return;
+		}
+		$settings = OBLT_Plugin::get_doc_settings();
+		$orders   = array( $order );
+		include OBLT_Documents::locate_template( 'credit-note.php' );
 		exit;
 	}
 }

@@ -1743,3 +1743,18 @@ msgid ""
 msgstr ""
 "Bitte geben Sie eine gültige USt-IdNr. ein (z. B. DE123456789) oder lassen "
 "Sie das Feld leer."
+
+msgid "Print credit note %s"
+msgstr "Rechnungskorrektur %s drucken"
+
+msgid "Download credit note PDF"
+msgstr "Rechnungskorrektur als PDF herunterladen"
+
+msgid "This order has no credit note."
+msgstr "Zu dieser Bestellung gibt es keine Rechnungskorrektur."
+
+msgid "Your credit note could not be prepared. Please try again or contact the store."
+msgstr "Ihre Rechnungskorrektur konnte nicht erstellt werden. Bitte versuchen Sie es erneut oder wenden Sie sich an den Shop."
+
+msgid "Your credit note PDF could not be prepared. Please use Print credit note instead, or contact the store."
+msgstr "Das PDF Ihrer Rechnungskorrektur konnte nicht erstellt werden. Bitte nutzen Sie stattdessen „Rechnungskorrektur drucken“ oder wenden Sie sich an den Shop."
