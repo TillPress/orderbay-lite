@@ -44,7 +44,6 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 				<?php if ( $oblt_inv_no ) : ?><div class="meta"><strong><?php esc_html_e( 'Invoice number', 'orderbay-lite' ); ?>:</strong> <?php echo esc_html( $oblt_inv_no ); ?></div><?php endif; ?>
 				<div class="meta">
 					<?php echo esc_html( $oblt_order->get_date_created() ? $oblt_order->get_date_created()->date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ) : '' ); ?>
-					· <?php echo esc_html( wc_get_order_status_name( $oblt_order->get_status() ) ); ?>
 					· <?php echo esc_html( $oblt_order->get_currency() ); ?>
 				</div>
 			</div>
@@ -57,10 +56,10 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 				<?php if ( $oblt_order->get_billing_email() ) : ?><br /><?php echo esc_html( $oblt_order->get_billing_email() ); ?><?php endif; ?>
 				<?php if ( $oblt_order->get_billing_phone() ) : ?><br /><?php echo esc_html( $oblt_order->get_billing_phone() ); ?><?php endif; ?>
 			</div>
-			<div><strong><?php esc_html_e( 'Ship to', 'orderbay-lite' ); ?></strong><?php
-				$oblt_ship = $oblt_order->get_formatted_shipping_address();
-				echo wp_kses_post( $oblt_ship ? $oblt_ship : '—' );
-			?></div>
+			<?php $oblt_ship = $oblt_order->get_formatted_shipping_address(); ?>
+			<?php if ( $oblt_ship ) : ?>
+				<div><strong><?php esc_html_e( 'Ship to', 'orderbay-lite' ); ?></strong><?php echo wp_kses_post( $oblt_ship ); ?></div>
+			<?php endif; ?>
 		</div>
 		<table class="items">
 			<thead>
@@ -113,6 +112,35 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 			<?php endforeach; ?>
 			<div class="row grand"><span><?php esc_html_e( 'Total', 'orderbay-lite' ); ?></span><span><?php echo wp_kses_post( $oblt_order->get_formatted_order_total() ); ?></span></div>
 		</div>
+		<?php
+		$oblt_pay = class_exists( 'OBLT_EInvoice' ) ? OBLT_EInvoice::payment_summary( $oblt_order, (array) $settings ) : null;
+		if ( $oblt_pay && ( $oblt_pay['paid'] || (float) $oblt_order->get_total() > 0 ) ) :
+			?>
+			<div class="notes payment">
+				<?php if ( $oblt_pay['paid'] ) : ?>
+					<strong><?php esc_html_e( 'Payment', 'orderbay-lite' ); ?>:</strong>
+					<?php
+					if ( '' !== $oblt_pay['paid_on'] ) {
+						/* translators: 1: payment date, 2: payment method. */
+						echo esc_html( sprintf( __( 'Paid on %1$s (%2$s).', 'orderbay-lite' ), date_i18n( get_option( 'date_format' ), strtotime( $oblt_pay['paid_on'] ) ), $oblt_pay['method'] ) );
+					} else {
+						esc_html_e( 'Paid.', 'orderbay-lite' );
+					}
+					?>
+				<?php else : ?>
+					<strong><?php esc_html_e( 'Payment due by', 'orderbay-lite' ); ?>:</strong> <?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( $oblt_pay['due_date'] ) ) ); ?>
+					<?php if ( '' !== $oblt_pay['iban'] ) : ?>
+						<br /><strong><?php esc_html_e( 'Bank transfer to', 'orderbay-lite' ); ?>:</strong>
+						<?php if ( '' !== $oblt_pay['account_name'] ) : ?><?php echo esc_html( $oblt_pay['account_name'] ); ?> · <?php endif; ?>
+						IBAN <?php echo esc_html( trim( chunk_split( $oblt_pay['iban'], 4, ' ' ) ) ); ?>
+						<?php if ( '' !== $oblt_pay['bic'] ) : ?> · BIC <?php echo esc_html( $oblt_pay['bic'] ); ?><?php endif; ?>
+						<br /><strong><?php esc_html_e( 'Payment reference', 'orderbay-lite' ); ?>:</strong> <?php echo esc_html( (string) ( $oblt_order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER ) ? $oblt_order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER ) : $oblt_order->get_order_number() ) ); ?>
+					<?php elseif ( '' !== $oblt_pay['method'] ) : ?>
+						· <?php echo esc_html( $oblt_pay['method'] ); ?>
+					<?php endif; ?>
+				<?php endif; ?>
+			</div>
+		<?php endif; ?>
 		<?php if ( $oblt_order->get_customer_note() ) : ?>
 			<div class="notes"><strong><?php esc_html_e( 'Customer note', 'orderbay-lite' ); ?>:</strong> <?php echo esc_html( $oblt_order->get_customer_note() ); ?></div>
 		<?php endif; ?>

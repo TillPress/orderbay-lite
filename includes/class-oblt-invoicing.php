@@ -274,6 +274,48 @@ class OBLT_Invoicing {
 	 * @return string
 	 */
 	private static function ensure_document_number( $order, $type, $meta_key, $sibling_meta, $opt_prefix, $opt_next, $default_prefix, $opt_format, $opt_reset, $note_sprintf ) {
+		$number = self::allocate_document_number( $order, $type, $meta_key, $sibling_meta, $opt_prefix, $opt_next, $default_prefix, $opt_format, $opt_reset, $note_sprintf );
+		self::sync_caller_meta( $order, $meta_key, $number );
+		return $number;
+	}
+
+	/**
+	 * The allocator saves the number on a freshly read copy of the order, so the
+	 * caller's own object still holds the old meta. Re-read it, so the document the
+	 * caller renders next (print, PDF, e-mail, XML) carries the number it was given.
+	 *
+	 * @param WC_Order $order    The caller's order object.
+	 * @param string   $meta_key Number meta key.
+	 * @param string   $number   Number returned by the allocator.
+	 */
+	private static function sync_caller_meta( $order, $meta_key, $number ) {
+		if ( ! $order instanceof WC_Order || '' === (string) $number ) {
+			return;
+		}
+		if ( (string) $order->get_meta( $meta_key ) === (string) $number ) {
+			return;
+		}
+		if ( method_exists( $order, 'read_meta_data' ) ) {
+			$order->read_meta_data( true );
+		}
+	}
+
+	/**
+	 * Allocation body for ensure_document_number().
+	 *
+	 * @param WC_Order $order           Order.
+	 * @param string   $type            Document type.
+	 * @param string   $meta_key        Meta key.
+	 * @param string   $sibling_meta    Sibling meta key to adopt.
+	 * @param string   $opt_prefix      Prefix option.
+	 * @param string   $opt_next        Next-counter option.
+	 * @param string   $default_prefix  Fallback prefix.
+	 * @param string   $opt_format      Format option.
+	 * @param string   $opt_reset       Reset option.
+	 * @param string   $note_sprintf    Order-note template with %s.
+	 * @return string
+	 */
+	private static function allocate_document_number( $order, $type, $meta_key, $sibling_meta, $opt_prefix, $opt_next, $default_prefix, $opt_format, $opt_reset, $note_sprintf ) {
 		if ( ! $order instanceof WC_Order ) {
 			return '';
 		}

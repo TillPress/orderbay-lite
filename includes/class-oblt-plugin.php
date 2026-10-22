@@ -52,6 +52,18 @@ class OBLT_Plugin {
 	}
 
 	/**
+	 * Paper size for a store that never chose one: Letter in the Americas countries that
+	 * use it, A4 everywhere else (from the WooCommerce store country).
+	 *
+	 * @return string 'letter' | 'a4'
+	 */
+	public static function default_paper() {
+		$country = strtoupper( substr( (string) get_option( 'woocommerce_default_country', '' ), 0, 2 ) );
+		$letter  = array( 'US', 'CA', 'MX', 'PH', 'CL', 'CO', 'VE', 'CR', 'GT', 'PA', 'DO', 'PR', 'SV', 'NI', 'HN', 'BZ' );
+		return ( '' === $country || in_array( $country, $letter, true ) ) ? 'letter' : 'a4';
+	}
+
+	/**
 	 * Default document settings.
 	 *
 	 * @return array
@@ -61,7 +73,7 @@ class OBLT_Plugin {
 			'logo_url'        => '',
 			'from_lines'      => get_bloginfo( 'name' ) . "\n" . get_option( 'woocommerce_store_address', '' ),
 			'footer_text'     => __( 'Thank you for your order.', 'orderbay-lite' ),
-			'paper'           => 'letter',
+			'paper'           => self::default_paper(),
 			'tax_id'          => '',
 			'peppol_id'       => '',
 			'seller_country'  => '',

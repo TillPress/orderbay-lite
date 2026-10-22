@@ -52,7 +52,7 @@ class OBLT_EInvoice {
 	/**
 	 * Add VAT number and Peppol ID to the order screen's billing fields so e-invoices can
 	 * carry the buyer's Peppol address. WooCommerce saves them as _billing_vat and
-	 * _billing_peppol_id. A field another plugin already added is left alone.
+	 * _billing_peppol_id, _billing_buyer_reference. A field another plugin already added is left alone.
 	 *
 	 * @param array $fields Billing fields.
 	 * @return array
@@ -72,6 +72,14 @@ class OBLT_EInvoice {
 				'label'       => __( 'Peppol ID', 'orderbay-lite' ),
 				'show'        => false,
 				'placeholder' => '0208:0123456789',
+			);
+		}
+		if ( ! isset( $fields['buyer_reference'] ) ) {
+			$fields['buyer_reference'] = array(
+				'label'       => __( 'Buyer reference / Leitweg-ID', 'orderbay-lite' ),
+				'show'        => false,
+				'placeholder' => '991-01234-56',
+				'description' => __( 'Goes into the e-invoice as BT-10. German public buyers need their Leitweg-ID here; otherwise the order number is used.', 'orderbay-lite' ),
 			);
 		}
 		return $fields;
@@ -314,6 +322,22 @@ class OBLT_EInvoice {
 			echo '</td></tr>';
 		};
 		echo '<table class="form-table">';
+		$seller = self::seller_data();
+		$addr   = trim( implode( ', ', array_filter( array( $seller['street'], $seller['street2'], trim( $seller['postcode'] . ' ' . $seller['city'] ), $seller['country'] ) ) ) );
+		echo '<tr><th>' . esc_html__( 'Seller address and email in e-invoices', 'orderbay-lite' ) . '</th><td>';
+		echo '<p><strong>' . esc_html( '' !== $addr ? $addr : __( '(no store address set)', 'orderbay-lite' ) ) . '</strong><br />' . esc_html( (string) $seller['email'] ) . '</p>';
+		echo '<p class="description">' . wp_kses_post(
+			sprintf(
+				/* translators: 1: link to WooCommerce general settings, 2: link to WooCommerce email settings. */
+				__( 'E-invoices (Factur-X, XRechnung, UBL, CII) need a structured address, so they take it from the %1$s and the email from the %2$s, not from the From name/address box above.', 'orderbay-lite' ),
+				'<a href="' . esc_url( admin_url( 'admin.php?page=wc-settings&tab=general' ) ) . '">' . esc_html__( 'WooCommerce store address', 'orderbay-lite' ) . '</a>',
+				'<a href="' . esc_url( admin_url( 'admin.php?page=wc-settings&tab=email' ) ) . '">' . esc_html__( 'WooCommerce email "From" address', 'orderbay-lite' ) . '</a>'
+			)
+		) . '</p>';
+		if ( self::address_mismatch( (string) ( $s['from_lines'] ?? '' ), $seller ) ) {
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'The From name/address above does not contain your WooCommerce store street or postcode, so your printed invoice and your e-invoice show different addresses. Make them match before sending e-invoices.', 'orderbay-lite' ) . '</p></div>';
+		}
+		echo '</td></tr>';
 		$profile = self::pdf_profile( $s );
 		echo '<tr><th><label for="oblt_einv_pdf_profile">' . esc_html__( 'Factur-X / ZUGFeRD PDF profile', 'orderbay-lite' ) . '</label></th><td>';
 		echo '<select id="oblt_einv_pdf_profile" name="' . esc_attr( $opt ) . '[einv_pdf_profile]">';
@@ -555,8 +579,8 @@ class OBLT_EInvoice {
 		$settings   = class_exists( 'OBLT_Plugin' ) ? OBLT_Plugin::get_doc_settings() : array();
 
 		// A paid order shows its payment as prepaid, so the buyer does not pay twice.
-		$paid      = method_exists( $order, 'is_paid' ) && $order->is_paid();
 		$paid_on   = method_exists( $order, 'get_date_paid' ) ? $order->get_date_paid() : null;
+		$paid      = self::is_settled( $order );
 		$done_on   = method_exists( $order, 'get_date_completed' ) ? $order->get_date_completed() : null;
 		$method    = method_exists( $order, 'get_payment_method_title' ) ? (string) $order->get_payment_method_title() : '';
 		$money     = self::amounts_due( $tax_inclusive, $payable, $paid );
@@ -630,6 +654,49 @@ class OBLT_EInvoice {
 	}
 
 	/**
+	 * Whether the money for an order has arrived. WooCommerce counts every Processing
+	 * order as paid, including cash on delivery where nothing has been received yet, so
+	 * trust its paid date (set when payment completes) or a Completed status instead.
+	 *
+	 * @param WC_Order $order Order.
+	 * @return bool
+	 */
+	public static function is_settled( $order ) {
+		if ( ! is_object( $order ) || ! method_exists( $order, 'is_paid' ) || ! $order->is_paid() ) {
+			return false;
+		}
+		$paid_on = method_exists( $order, 'get_date_paid' ) ? $order->get_date_paid() : null;
+		return $paid_on || ( method_exists( $order, 'has_status' ) && $order->has_status( 'completed' ) );
+	}
+
+	/**
+	 * Payment block for the printed invoice: how it was paid, or by when and where to pay.
+	 * Uses the same paid rule and due date as the e-invoice XML.
+	 *
+	 * @param WC_Order $order    Order.
+	 * @param array    $settings Document settings.
+	 * @return array{paid:bool,paid_on:string,method:string,due_date:string,iban:string,bic:string,account_name:string}
+	 */
+	public static function payment_summary( $order, array $settings ) {
+		$paid     = self::is_settled( $order );
+		$paid_on  = method_exists( $order, 'get_date_paid' ) ? $order->get_date_paid() : null;
+		$method   = method_exists( $order, 'get_payment_method_title' ) ? (string) $order->get_payment_method_title() : '';
+		$created  = method_exists( $order, 'get_date_created' ) ? $order->get_date_created() : null;
+		$issue    = $created ? $created->date( 'Y-m-d' ) : gmdate( 'Y-m-d' );
+		$due_days = isset( $settings['einv_due_days'] ) && '' !== (string) $settings['einv_due_days'] ? max( 0, (int) $settings['einv_due_days'] ) : 14;
+		$means    = self::payment_means( $settings, $method );
+		return array(
+			'paid'         => $paid,
+			'paid_on'      => ( $paid && $paid_on ) ? $paid_on->date( 'Y-m-d' ) : '',
+			'method'       => $method,
+			'due_date'     => $paid ? '' : gmdate( 'Y-m-d', (int) strtotime( $issue . ' +' . $due_days . ' days' ) ),
+			'iban'         => $means['iban'],
+			'bic'          => $means['bic'],
+			'account_name' => $means['account_name'],
+		);
+	}
+
+	/**
 	 * Payment instructions (BG-16): SEPA credit transfer when an IBAN is set, otherwise
 	 * "instrument not defined" with the WooCommerce payment method as text. Pure.
 	 *
@@ -698,6 +765,26 @@ class OBLT_EInvoice {
 		}
 		unset( $g );
 		return array_values( $groups );
+	}
+
+	/**
+	 * True when the printed From block names a different place than the store address the
+	 * e-invoice uses (neither its street nor its postcode appears). Empty From block or postcode: no warning. Pure.
+	 *
+	 * @param string $from_lines From name/address box.
+	 * @param array  $seller     seller_data().
+	 * @return bool
+	 */
+	public static function address_mismatch( $from_lines, array $seller ) {
+		$postcode = preg_replace( '/\s+/', '', (string) ( $seller['postcode'] ?? '' ) );
+		$street   = preg_replace( '/\s+/', '', (string) ( $seller['street'] ?? '' ) );
+		$from     = preg_replace( '/\s+/', '', (string) $from_lines );
+		if ( '' === $from || ( '' === $postcode && '' === $street ) ) {
+			return false;
+		}
+		$has_postcode = '' !== $postcode && false !== stripos( $from, $postcode );
+		$has_street   = '' !== $street && false !== stripos( $from, $street );
+		return ! $has_postcode && ! $has_street;
 	}
 
 	/**

@@ -4,7 +4,7 @@ Tags: woocommerce, invoice, credit note, e-invoice, pdf
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.4.0
+Stable tag: 1.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 WC requires at least: 7.0
@@ -109,6 +109,14 @@ Delivery notes, shipping labels, proforma invoices, bulk and multi-order packing
 
 
 
+
+= 1.4.1 =
+* Fix: the first invoice made for an order now carries its invoice number. Before, the first print, the emailed PDF and the Factur-X PDF showed no number, and the XRechnung/UBL/CII file used the order number as the invoice ID.
+* Fix: cash-on-delivery orders are no longer marked as paid in e-invoices while they are still Processing. An order counts as paid once WooCommerce records a payment date or it is Completed.
+* New: printed and PDF invoices show the payment due date and your bank details (IBAN, BIC, account holder, payment reference) for unpaid orders, and when and how a paid order was paid. The internal order status and an empty "Ship to" block are no longer printed.
+* New: Buyer reference / Leitweg-ID field on the order's billing details. It goes into the e-invoice as the buyer reference; German public buyers need it.
+* New: the E-invoicing settings show the store address and email that e-invoices use, and warn when the From address on your invoices is a different one.
+* Change: stores outside the US and other Letter-paper countries now default to A4 paper (only when no paper size was saved yet).
 = 1.4.0 =
 * New: Factur-X / ZUGFeRD PDF invoices. A new button on the order screen downloads the invoice as a PDF/A-3 file with the invoice data inside, the format French and German buyers' accounting software reads. It is made on your own server with the bundled PDF engine; nothing extra to install. You can also attach it to emails instead of the plain PDF.
 * New: XRechnung 3.0 for German public-sector buyers, as XML or as a ZUGFeRD PDF with the XRechnung profile. The buyer reference (Leitweg-ID) comes from the order's buyer reference field.
@@ -169,6 +177,9 @@ Delivery notes, shipping labels, proforma invoices, bulk and multi-order packing
 * First public release: printable invoices, sequential invoice numbering with format tokens and counter reset, credit notes, customer My Account invoice download, UBL 2.1 + Factur-X CII e-invoice XML export.
 
 == Upgrade Notice ==
+
+= 1.4.1 =
+Fixes the missing invoice number on the first invoice of an order and cash-on-delivery orders shown as paid; adds bank details to unpaid invoices.
 
 = 1.4.0 =
 Adds Factur-X / ZUGFeRD PDF invoices and XRechnung, and fixes e-invoices for unpaid orders so they pass EN 16931.
