@@ -4,7 +4,7 @@ Tags: woocommerce, invoice, credit note, e-invoice, pdf
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.4.1
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 WC requires at least: 7.0
@@ -110,6 +110,17 @@ Delivery notes, shipping labels, proforma invoices, bulk and multi-order packing
 
 
 
+
+= 1.5.0 =
+* New: tax-free sales to EU businesses. When WooCommerce charges 0% to an EU business with a VAT ID, the invoice and e-invoice say intra-community supply (K, VATEX-EU-IC) with the delivery address, or reverse charge (AE) if you sell services; deliveries outside the EU are exports (G). An issued invoice keeps its category.
+* New: optional checkout fields for the buyer's VAT ID and buyer reference / Leitweg-ID, in the classic and block checkout. Off by default. The VAT ID format is checked.
+* New: the invoice PDF is attached to the On-hold email (bank transfer orders) by default.
+* New: refunded orders without a credit note show an "Issue credit note" button on the order screen.
+* New: complete German translation (de_DE). Credit notes are called Rechnungskorrektur.
+* Improved: credit notes name the invoice they correct and show credited amounts as negative.
+* Fix: cash on delivery invoices no longer ask for a bank transfer (payment means 10, cash).
+* Fix: bank details fall back to the WooCommerce bank transfer account when the e-invoice IBAN is empty.
+* Fix: refunded orders no longer show a crossed-out total on the invoice; no empty brackets after "Paid on".
 = 1.4.1 =
 * Fix: the first invoice made for an order now carries its invoice number. Before, the first print, the emailed PDF and the Factur-X PDF showed no number, and the XRechnung/UBL/CII file used the order number as the invoice ID.
 * Fix: cash-on-delivery orders are no longer marked as paid in e-invoices while they are still Processing. An order counts as paid once WooCommerce records a payment date or it is Completed.
@@ -177,6 +188,9 @@ Delivery notes, shipping labels, proforma invoices, bulk and multi-order packing
 * First public release: printable invoices, sequential invoice numbering with format tokens and counter reset, credit notes, customer My Account invoice download, UBL 2.1 + Factur-X CII e-invoice XML export.
 
 == Upgrade Notice ==
+
+= 1.5.0 =
+EU tax-free sales (intra-community, reverse charge, export), checkout VAT ID and Leitweg-ID fields, invoice on the On-hold email, German translation.
 
 = 1.4.1 =
 Fixes the missing invoice number on the first invoice of an order and cash-on-delivery orders shown as paid; adds bank details to unpaid invoices.

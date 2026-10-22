@@ -47,6 +47,10 @@ class OBLT_EInvoice {
 		add_action( 'admin_post_oblt_einvoice', array( $this, 'handle_download' ) );
 		add_action( 'admin_post_oblt_facturx', array( $this, 'handle_facturx' ) );
 		add_filter( 'woocommerce_admin_billing_fields', array( $this, 'admin_billing_fields' ) );
+		add_filter( 'woocommerce_billing_fields', array( $this, 'checkout_billing_fields' ), 20 );
+		add_action( 'woocommerce_init', array( $this, 'register_block_checkout_fields' ) );
+		add_action( 'woocommerce_set_additional_field_value', array( $this, 'store_block_checkout_field' ), 10, 4 );
+		add_action( 'woocommerce_after_checkout_validation', array( $this, 'validate_classic_checkout' ), 10, 2 );
 	}
 
 	/**
@@ -83,6 +87,193 @@ class OBLT_EInvoice {
 			);
 		}
 		return $fields;
+	}
+
+	/**
+	 * Which optional checkout fields the store turned on (E-invoicing settings).
+	 *
+	 * @param array|null $s Document settings (null = load).
+	 * @return array{vat:bool,ref:bool}
+	 */
+	public static function checkout_fields_on( $s = null ) {
+		$s = is_array( $s ) ? $s : ( class_exists( 'OBLT_Plugin' ) ? OBLT_Plugin::get_doc_settings() : array() );
+		return array(
+			'vat' => '1' === (string) ( $s['checkout_vat'] ?? '0' ),
+			'ref' => '1' === (string) ( $s['checkout_buyer_ref'] ?? '0' ),
+		);
+	}
+
+	/**
+	 * Classic checkout (and My Account address form): optional VAT ID and buyer reference.
+	 * WooCommerce saves them on the order as _billing_vat and _billing_buyer_reference,
+	 * the keys the e-invoice reads. A field another plugin already added is left alone.
+	 *
+	 * @param array $fields Billing fields.
+	 * @return array
+	 */
+	public function checkout_billing_fields( $fields ) {
+		if ( ! is_array( $fields ) ) {
+			return $fields;
+		}
+		$on = self::checkout_fields_on();
+		if ( $on['vat'] && ! isset( $fields['billing_vat'] ) ) {
+			$fields['billing_vat'] = array(
+				'label'       => __( 'VAT ID', 'orderbay-lite' ),
+				'placeholder' => 'DE123456789',
+				'required'    => false,
+				'class'       => array( 'form-row-wide' ),
+				'priority'    => 31,
+			);
+		}
+		if ( $on['ref'] && ! isset( $fields['billing_buyer_reference'] ) ) {
+			$fields['billing_buyer_reference'] = array(
+				'label'       => __( 'Buyer reference / Leitweg-ID', 'orderbay-lite' ),
+				'description' => __( 'For business and public-sector invoices, if your accounts team gave you one.', 'orderbay-lite' ),
+				'required'    => false,
+				'class'       => array( 'form-row-wide' ),
+				'priority'    => 32,
+			);
+		}
+		return $fields;
+	}
+
+	/**
+	 * Block checkout: the same two optional fields, in the order section.
+	 */
+	public function register_block_checkout_fields() {
+		if ( ! function_exists( 'woocommerce_register_additional_checkout_field' ) ) {
+			return;
+		}
+		$on = self::checkout_fields_on();
+		try {
+			if ( $on['vat'] ) {
+				woocommerce_register_additional_checkout_field(
+					array(
+						'id'                => 'orderbay-lite/vat-id',
+						'label'             => __( 'VAT ID', 'orderbay-lite' ),
+						'location'          => 'order',
+						'type'              => 'text',
+						'required'          => false,
+						'validate_callback' => array( __CLASS__, 'validate_vat_field' ),
+					)
+				);
+			}
+			if ( $on['ref'] ) {
+				woocommerce_register_additional_checkout_field(
+					array(
+						'id'       => 'orderbay-lite/buyer-reference',
+						'label'    => __( 'Buyer reference / Leitweg-ID', 'orderbay-lite' ),
+						'location' => 'order',
+						'type'     => 'text',
+						'required' => false,
+					)
+				);
+			}
+		} catch ( \Throwable $e ) {
+			unset( $e ); // Already registered or blocks unavailable: the classic fields still work.
+		}
+	}
+
+	/**
+	 * Copy a block-checkout field onto the order meta the e-invoice reads.
+	 *
+	 * @param string $key       Field id.
+	 * @param mixed  $value     Value.
+	 * @param string $group     Group.
+	 * @param mixed  $wc_object Order or customer.
+	 */
+	public function store_block_checkout_field( $key, $value, $group, $wc_object ) {
+		$map = array(
+			'orderbay-lite/vat-id'          => '_billing_vat',
+			'orderbay-lite/buyer-reference' => '_billing_buyer_reference',
+		);
+		if ( ! isset( $map[ $key ] ) || ! $wc_object instanceof WC_Order ) {
+			return;
+		}
+		$clean = trim( wp_specialchars_decode( sanitize_text_field( (string) $value ), ENT_QUOTES ) );
+		if ( '_billing_vat' === $map[ $key ] ) {
+			$clean = self::normalize_vat( $clean );
+		}
+		$wc_object->update_meta_data( $map[ $key ], $clean );
+	}
+
+	/**
+	 * VAT ID as stored and exported: tags, spaces, dots and dashes removed, upper case. Pure.
+	 *
+	 * @param string $vat Raw input.
+	 * @return string
+	 */
+	public static function normalize_vat( $vat ) {
+		$vat = function_exists( 'wp_strip_all_tags' ) ? wp_strip_all_tags( (string) $vat ) : (string) preg_replace( '/<[^>]*>/', '', (string) $vat );
+		return strtoupper( (string) preg_replace( '/[\s.\-]+/', '', html_entity_decode( $vat, ENT_QUOTES, 'UTF-8' ) ) );
+	}
+
+	/**
+	 * Whether a VAT ID looks valid: an EU (or GB, XI, CH, NO) country prefix, then 2-13
+	 * letters or digits with at least one digit. Format only, no VIES lookup. Pure.
+	 *
+	 * @param string $vat VAT ID.
+	 * @return bool
+	 */
+	public static function is_valid_vat( $vat ) {
+		$vat = self::normalize_vat( $vat );
+		if ( ! preg_match( '/^([A-Z]{2})([0-9A-Z]{2,13})$/', $vat, $m ) || ! preg_match( '/\d/', $m[2] ) ) {
+			return false;
+		}
+		return in_array( $m[1], array_merge( self::EU_COUNTRIES, array( 'EL', 'XI', 'GB', 'CH', 'NO' ) ), true );
+	}
+
+	/**
+	 * Block checkout validation for the VAT ID field. Empty is fine (the field is optional).
+	 *
+	 * @param mixed $value Field value.
+	 * @return true|WP_Error
+	 */
+	public static function validate_vat_field( $value ) {
+		$value = trim( (string) $value );
+		if ( '' === $value || self::is_valid_vat( $value ) ) {
+			return true;
+		}
+		return new WP_Error( 'invalid_vat_id', self::invalid_vat_message() );
+	}
+
+	/**
+	 * Classic checkout validation for the VAT ID field.
+	 *
+	 * @param array    $data   Posted checkout data.
+	 * @param WP_Error $errors Errors.
+	 */
+	public function validate_classic_checkout( $data, $errors ) {
+		if ( ! is_array( $data ) || ! $errors instanceof WP_Error || ! self::checkout_fields_on()['vat'] ) {
+			return;
+		}
+		$vat = trim( (string) ( $data['billing_vat'] ?? '' ) );
+		if ( '' !== $vat && ! self::is_valid_vat( $vat ) ) {
+			$errors->add( 'invalid_vat_id', self::invalid_vat_message() );
+		}
+	}
+
+	/**
+	 * @return string
+	 */
+	private static function invalid_vat_message() {
+		return __( 'Please enter a valid VAT ID (for example DE123456789), or leave the field empty.', 'orderbay-lite' );
+	}
+
+	/**
+	 * Buyer VAT ID from the order: OrderBay's key first, then keys common EU VAT plugins use.
+	 *
+	 * @param WC_Order $order Order.
+	 * @return string
+	 */
+	public static function buyer_vat( $order ) {
+		foreach ( array( '_billing_vat', '_billing_vat_number', '_vat_number', 'vat_number', '_billing_eu_vat_number' ) as $k ) {
+			$v = trim( (string) $order->get_meta( $k ) );
+			if ( '' !== $v ) {
+				return self::normalize_vat( $v );
+			}
+		}
+		return '';
 	}
 
 	/**
@@ -280,6 +471,9 @@ class OBLT_EInvoice {
 		$profile                 = isset( $input['einv_pdf_profile'] ) ? sanitize_key( $input['einv_pdf_profile'] ) : 'en16931';
 		$out['einv_pdf_profile'] = in_array( $profile, self::PDF_PROFILES, true ) ? $profile : 'en16931';
 		$out['einv_email_facturx'] = ! empty( $input['einv_email_facturx'] ) ? '1' : '0';
+		$out['checkout_vat']       = ! empty( $input['checkout_vat'] ) ? '1' : '0';
+		$out['checkout_buyer_ref'] = ! empty( $input['checkout_buyer_ref'] ) ? '1' : '0';
+		$out['einv_eu_b2b']        = ( isset( $input['einv_eu_b2b'] ) && 'services' === $input['einv_eu_b2b'] ) ? 'services' : 'goods';
 		return $out;
 	}
 
@@ -347,6 +541,16 @@ class OBLT_EInvoice {
 		echo '<tr><th>' . esc_html__( 'Emailed invoices', 'orderbay-lite' ) . '</th><td><label><input type="checkbox" name="' . esc_attr( $opt ) . '[einv_email_facturx]" value="1"' . checked( '1', (string) ( $s['einv_email_facturx'] ?? '0' ), false ) . ' /> ';
 		echo esc_html__( 'Attach the Factur-X / ZUGFeRD PDF instead of the plain invoice PDF', 'orderbay-lite' ) . '</label>';
 		echo '<p class="description">' . esc_html__( 'Customers see the same invoice; their accounting software can read the data inside it.', 'orderbay-lite' ) . '</p></td></tr>';
+		$eu_b2b = (string) ( $s['einv_eu_b2b'] ?? 'goods' );
+		echo '<tr><th><label for="ob_einv_eu_b2b">' . esc_html__( 'Tax-free sales to EU businesses', 'orderbay-lite' ) . '</label></th><td>';
+		echo '<select id="ob_einv_eu_b2b" name="' . esc_attr( $opt ) . '[einv_eu_b2b]">';
+		echo '<option value="goods"' . selected( $eu_b2b, 'goods', false ) . '>' . esc_html__( 'Goods: intra-community supply', 'orderbay-lite' ) . '</option>';
+		echo '<option value="services"' . selected( $eu_b2b, 'services', false ) . '>' . esc_html__( 'Services: reverse charge', 'orderbay-lite' ) . '</option>';
+		echo '</select><p class="description">' . esc_html__( 'When WooCommerce charged 0% VAT to a business with a VAT ID in another EU country, invoices and e-invoices name the reason. Deliveries outside the EU are marked as exports. Your tax setup in WooCommerce still decides whether VAT is charged.', 'orderbay-lite' ) . '</p></td></tr>';
+		echo '<tr><th>' . esc_html__( 'Checkout fields', 'orderbay-lite' ) . '</th><td>';
+		echo '<label style="display:block"><input type="checkbox" name="' . esc_attr( $opt ) . '[checkout_vat]" value="1"' . checked( '1', (string) ( $s['checkout_vat'] ?? '0' ), false ) . ' /> ' . esc_html__( 'Ask for the buyer\'s VAT ID (optional field)', 'orderbay-lite' ) . '</label>';
+		echo '<label style="display:block"><input type="checkbox" name="' . esc_attr( $opt ) . '[checkout_buyer_ref]" value="1"' . checked( '1', (string) ( $s['checkout_buyer_ref'] ?? '0' ), false ) . ' /> ' . esc_html__( 'Ask for a buyer reference / Leitweg-ID (optional field)', 'orderbay-lite' ) . '</label>';
+		echo '<p class="description">' . esc_html__( 'Works with the classic and the block checkout. The values go on the invoice and into the e-invoice; a business buyer\'s VAT ID from another EU country lets a 0% order be marked as an intra-EU supply.', 'orderbay-lite' ) . '</p></td></tr>';
 		$text( 'einv_contact', __( 'Invoice contact name', 'orderbay-lite' ), __( 'Shown as the seller contact. Leave empty to use the company name.', 'orderbay-lite' ) );
 		$text( 'einv_phone', __( 'Invoice contact phone', 'orderbay-lite' ), __( 'Required for XRechnung.', 'orderbay-lite' ), '+49 30 1234567' );
 		$text( 'einv_iban', __( 'IBAN for bank transfer', 'orderbay-lite' ), __( 'Optional. When set, unpaid invoices ask for a SEPA transfer to this account.', 'orderbay-lite' ) );
@@ -567,12 +771,49 @@ class OBLT_EInvoice {
 			'city'     => (string) $order->get_billing_city(),
 			'postcode' => (string) $order->get_billing_postcode(),
 			'country'  => strtoupper( (string) $order->get_billing_country() ),
-			'vat'      => (string) $order->get_meta( '_billing_vat' ),
+			'vat'      => self::buyer_vat( $order ),
 			'email'    => (string) $order->get_billing_email(),
 		);
 		$buyer['endpoint'] = self::peppol_endpoint( (string) $order->get_meta( '_billing_peppol_id' ), $buyer['vat'], $buyer['country'] );
 
-		$buyer_reference = trim( (string) $order->get_meta( '_billing_buyer_reference' ) );
+		// Zero-rate lines: say why there is no VAT (intra-EU supply, reverse charge or export).
+		$ship_country = method_exists( $order, 'get_shipping_country' ) ? strtoupper( (string) $order->get_shipping_country() ) : '';
+		$deliver_to   = '' !== $ship_country ? $ship_country : $buyer['country'];
+		$deliver_addr = '' !== $ship_country
+			? array(
+				'street'   => (string) $order->get_shipping_address_1(),
+				'city'     => (string) $order->get_shipping_city(),
+				'postcode' => (string) $order->get_shipping_postcode(),
+				'country'  => $ship_country,
+			)
+			: array(
+				'street'   => $buyer['street'],
+				'city'     => $buyer['city'],
+				'postcode' => $buyer['postcode'],
+				'country'  => $buyer['country'],
+			);
+		$doc_settings = class_exists( 'OBLT_Plugin' ) ? OBLT_Plugin::get_doc_settings() : array();
+		$zero_cat     = self::zero_rate_category( (string) $seller['country'], $buyer['country'], $deliver_to, $buyer['vat'], $doc_settings );
+		// Once the invoice has a number, its tax category is fixed: a later settings change
+		// must not rewrite an invoice that was already issued.
+		$frozen_cat = (string) $order->get_meta( '_oblt_zero_vat_category' );
+		if ( in_array( $frozen_cat, array( 'K', 'AE', 'G', 'Z' ), true ) ) {
+			$zero_cat = $frozen_cat;
+		} elseif ( '' !== (string) $order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER ) && method_exists( $order, 'save_meta_data' ) ) {
+			$order->update_meta_data( '_oblt_zero_vat_category', $zero_cat );
+			$order->save_meta_data();
+		}
+		if ( 'Z' !== $zero_cat ) {
+			foreach ( $lines as &$zl ) {
+				if ( 'Z' === $zl['tax_category'] ) {
+					$zl['tax_category'] = $zero_cat;
+				}
+			}
+			unset( $zl );
+			$tax_subtotals = self::group_tax( $lines );
+		}
+
+		$buyer_reference = trim( html_entity_decode( (string) $order->get_meta( '_billing_buyer_reference' ), ENT_QUOTES, 'UTF-8' ) );
 
 		$date       = $order->get_date_created();
 		$issue_date = $date ? $date->date( 'Y-m-d' ) : gmdate( 'Y-m-d' );
@@ -603,13 +844,15 @@ class OBLT_EInvoice {
 			'due_date'       => $due_date,
 			'delivery_date'  => $delivered ? $delivered->date( 'Y-m-d' ) : $issue_date,
 			'payment_terms'  => $terms,
-			'payment'        => self::payment_means( $settings, $method ),
+			'payment'        => self::payment_means( $settings, $method, method_exists( $order, 'get_payment_method' ) ? (string) $order->get_payment_method() : '' ),
 			'currency'       => (string) $order->get_currency(),
 			'type_code'      => '380',
 			'note'           => (string) $order->get_customer_note(),
 			'buyer_ref'      => '' !== $buyer_reference ? $buyer_reference : (string) $order->get_order_number(),
 			'seller'         => $seller,
 			'buyer'          => $buyer,
+			'deliver_to'     => $deliver_to,
+			'deliver_addr'   => $deliver_addr,
 			'lines'          => $lines,
 			'tax_subtotals'  => $tax_subtotals,
 			'totals'         => array(
@@ -670,6 +913,33 @@ class OBLT_EInvoice {
 	}
 
 	/**
+	 * Tax lines for the printed invoice: the buyer's VAT ID and reference, and why a
+	 * zero-rated sale has no VAT (the same reasons the e-invoice carries).
+	 *
+	 * @param WC_Order $order Order.
+	 * @return array{buyer_vat:string,buyer_ref:string,reasons:string[]}
+	 */
+	public static function invoice_tax_notes( $order ) {
+		$out = array(
+			'buyer_vat' => self::buyer_vat( $order ),
+			'buyer_ref' => trim( html_entity_decode( (string) $order->get_meta( '_billing_buyer_reference' ), ENT_QUOTES, 'UTF-8' ) ),
+			'reasons'   => array(),
+		);
+		try {
+			$data = self::order_to_invoice_data( $order );
+			foreach ( (array) ( $data['tax_subtotals'] ?? array() ) as $g ) {
+				if ( ! empty( $g['reason'] ) ) {
+					$out['reasons'][] = (string) $g['reason'];
+				}
+			}
+			$out['reasons'] = array_values( array_unique( $out['reasons'] ) );
+		} catch ( \Throwable $e ) {
+			unset( $e ); // The printed invoice never fails because of the e-invoice mapper.
+		}
+		return $out;
+	}
+
+	/**
 	 * Payment block for the printed invoice: how it was paid, or by when and where to pay.
 	 * Uses the same paid rule and due date as the e-invoice XML.
 	 *
@@ -684,7 +954,7 @@ class OBLT_EInvoice {
 		$created  = method_exists( $order, 'get_date_created' ) ? $order->get_date_created() : null;
 		$issue    = $created ? $created->date( 'Y-m-d' ) : gmdate( 'Y-m-d' );
 		$due_days = isset( $settings['einv_due_days'] ) && '' !== (string) $settings['einv_due_days'] ? max( 0, (int) $settings['einv_due_days'] ) : 14;
-		$means    = self::payment_means( $settings, $method );
+		$means    = self::payment_means( $settings, $method, method_exists( $order, 'get_payment_method' ) ? (string) $order->get_payment_method() : '' );
 		return array(
 			'paid'         => $paid,
 			'paid_on'      => ( $paid && $paid_on ) ? $paid_on->date( 'Y-m-d' ) : '',
@@ -702,11 +972,32 @@ class OBLT_EInvoice {
 	 *
 	 * @param array  $settings Document settings.
 	 * @param string $method   Payment method title.
+	 * @param string $gateway  Payment gateway id; cash on delivery is paid in cash (code 10), not by transfer.
 	 * @return array{code:string,info:string,iban:string,bic:string,account_name:string}
 	 */
-	public static function payment_means( array $settings, $method = '' ) {
+	public static function payment_means( array $settings, $method = '', $gateway = '' ) {
+		if ( 'cod' === $gateway ) {
+			return array(
+				'code'         => '10',
+				'info'         => (string) $method,
+				'iban'         => '',
+				'bic'          => '',
+				'account_name' => '',
+			);
+		}
 		$iban = strtoupper( preg_replace( '/\s+/', '', (string) ( $settings['einv_iban'] ?? '' ) ) );
 		$bic  = strtoupper( preg_replace( '/\s+/', '', (string) ( $settings['einv_bic'] ?? '' ) ) );
+		if ( '' === $iban && function_exists( 'get_option' ) ) {
+			// No IBAN in the e-invoice settings: use the first WooCommerce bank transfer (BACS) account.
+			$bacs = get_option( 'woocommerce_bacs_accounts', array() );
+			if ( is_array( $bacs ) && isset( $bacs[0] ) && is_array( $bacs[0] ) && ! empty( $bacs[0]['iban'] ) ) {
+				$iban = strtoupper( preg_replace( '/\s+/', '', (string) $bacs[0]['iban'] ) );
+				$bic  = strtoupper( preg_replace( '/\s+/', '', (string) ( $bacs[0]['bic'] ?? '' ) ) );
+				if ( empty( $settings['einv_account_name'] ) && ! empty( $bacs[0]['account_name'] ) ) {
+					$settings['einv_account_name'] = (string) $bacs[0]['account_name'];
+				}
+			}
+		}
 		return array(
 			'code'         => '' !== $iban ? '58' : '1',
 			'info'         => '' !== $iban ? __( 'SEPA credit transfer', 'orderbay-lite' ) : (string) $method,
@@ -740,6 +1031,82 @@ class OBLT_EInvoice {
 	}
 
 	/**
+	 * EU member states (VAT prefixes use EL for Greece; country codes use GR).
+	 *
+	 * @var string[]
+	 */
+	const EU_COUNTRIES = array( 'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK' );
+
+	/**
+	 * VAT category for lines WooCommerce charged at 0%. Pure.
+	 *
+	 * - Business buyer with a VAT ID in another EU country: K (intra-community supply of
+	 *   goods), or AE (reverse charge) when the store sells services.
+	 * - Delivery outside the EU from an EU seller: G (export).
+	 * - Anything else stays Z, as before.
+	 *
+	 * @param string $seller_country Seller country (ISO 3166-1 alpha-2).
+	 * @param string $buyer_country  Buyer billing country.
+	 * @param string $deliver_to     Delivery country (shipping, else billing).
+	 * @param string $buyer_vat      Buyer VAT ID.
+	 * @param array  $settings       Document settings (einv_eu_b2b: goods|services).
+	 * @return string K|AE|G|Z
+	 */
+	public static function zero_rate_category( $seller_country, $buyer_country, $deliver_to, $buyer_vat, array $settings = array() ) {
+		$seller = strtoupper( (string) $seller_country );
+		$buyer  = strtoupper( (string) $buyer_country );
+		$dest   = strtoupper( (string) $deliver_to );
+		if ( ! in_array( $seller, self::EU_COUNTRIES, true ) ) {
+			return 'Z';
+		}
+		$vat = strtoupper( (string) preg_replace( '/[\s.\-]+/', '', (string) $buyer_vat ) );
+		if ( '' !== $vat && in_array( $buyer, self::EU_COUNTRIES, true ) && $buyer !== $seller ) {
+			return 'services' === (string) ( $settings['einv_eu_b2b'] ?? 'goods' ) ? 'AE' : 'K';
+		}
+		if ( '' !== $dest && ! in_array( $dest, self::EU_COUNTRIES, true ) ) {
+			return 'G';
+		}
+		return 'Z';
+	}
+
+	/**
+	 * VAT exemption reason (BT-121 code, BT-120 text) that EN 16931 requires for K, AE
+	 * and G, and forbids for S and Z. Pure.
+	 *
+	 * @param string $category VAT category code.
+	 * @return array{code:string,text:string}
+	 */
+	public static function exemption_reason( $category ) {
+		switch ( (string) $category ) {
+			case 'K':
+				return array( 'code' => 'VATEX-EU-IC', 'text' => __( 'Intra-community supply (tax-free under Article 138 VAT Directive)', 'orderbay-lite' ) );
+			case 'AE':
+				return array( 'code' => 'VATEX-EU-AE', 'text' => __( 'Reverse charge: VAT is payable by the customer', 'orderbay-lite' ) );
+			case 'G':
+				return array( 'code' => 'VATEX-EU-G', 'text' => __( 'Export outside the EU (tax-free)', 'orderbay-lite' ) );
+		}
+		return array( 'code' => '', 'text' => '' );
+	}
+
+	/**
+	 * K lines need the deliver-to country (BR-IC-12). Pure.
+	 *
+	 * @param array $d Invoice data.
+	 * @return bool
+	 */
+	public static function needs_deliver_to( array $d ) {
+		if ( empty( $d['deliver_to'] ) || empty( $d['tax_subtotals'] ) ) {
+			return false;
+		}
+		foreach ( (array) $d['tax_subtotals'] as $g ) {
+			if ( 'K' === ( $g['category'] ?? '' ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Group lines into per-category, per-rate tax subtotals.
 	 *
 	 * @param array $lines Lines.
@@ -750,11 +1117,14 @@ class OBLT_EInvoice {
 		foreach ( $lines as $ln ) {
 			$key = $ln['tax_category'] . '|' . $ln['tax_percent'];
 			if ( ! isset( $groups[ $key ] ) ) {
+				$reason         = self::exemption_reason( $ln['tax_category'] );
 				$groups[ $key ] = array(
-					'category' => $ln['tax_category'],
-					'percent'  => $ln['tax_percent'],
-					'taxable'  => 0.0,
-					'tax'      => 0.0,
+					'category'    => $ln['tax_category'],
+					'percent'     => $ln['tax_percent'],
+					'taxable'     => 0.0,
+					'tax'         => 0.0,
+					'reason_code' => $reason['code'],
+					'reason'      => $reason['text'],
 				);
 			}
 			$groups[ $key ]['taxable'] += $ln['line_net'];
@@ -953,9 +1323,28 @@ class OBLT_EInvoice {
 		$customer = self::el( $doc, $root, 'cac:AccountingCustomerParty' );
 		self::ubl_party( $doc, $customer, $d['buyer'], $xr, false );
 
-		if ( ! empty( $d['delivery_date'] ) ) {
+		$deliver_to = self::needs_deliver_to( $d ) ? (string) $d['deliver_to'] : '';
+		if ( ! empty( $d['delivery_date'] ) || '' !== $deliver_to ) {
 			$delivery = self::el( $doc, $root, 'cac:Delivery' );
-			self::el( $doc, $delivery, 'cbc:ActualDeliveryDate', (string) $d['delivery_date'] );
+			if ( ! empty( $d['delivery_date'] ) ) {
+				self::el( $doc, $delivery, 'cbc:ActualDeliveryDate', (string) $d['delivery_date'] );
+			}
+			if ( '' !== $deliver_to ) {
+				$loc  = self::el( $doc, $delivery, 'cac:DeliveryLocation' );
+				$addr = self::el( $doc, $loc, 'cac:Address' );
+				$da   = isset( $d['deliver_addr'] ) && is_array( $d['deliver_addr'] ) ? $d['deliver_addr'] : array();
+				if ( ! empty( $da['street'] ) ) {
+					self::el( $doc, $addr, 'cbc:StreetName', (string) $da['street'] );
+				}
+				if ( ! empty( $da['city'] ) ) {
+					self::el( $doc, $addr, 'cbc:CityName', (string) $da['city'] );
+				}
+				if ( ! empty( $da['postcode'] ) ) {
+					self::el( $doc, $addr, 'cbc:PostalZone', (string) $da['postcode'] );
+				}
+				$ctry = self::el( $doc, $addr, 'cac:Country' );
+				self::el( $doc, $ctry, 'cbc:IdentificationCode', $deliver_to );
+			}
 		}
 
 		$pay = isset( $d['payment'] ) && is_array( $d['payment'] ) ? $d['payment'] : array();
@@ -991,6 +1380,10 @@ class OBLT_EInvoice {
 			$cat = self::el( $doc, $sub, 'cac:TaxCategory' );
 			self::el( $doc, $cat, 'cbc:ID', (string) $g['category'] );
 			self::el( $doc, $cat, 'cbc:Percent', self::money( $g['percent'] ) );
+			if ( ! empty( $g['reason_code'] ) ) {
+				self::el( $doc, $cat, 'cbc:TaxExemptionReasonCode', (string) $g['reason_code'] );
+				self::el( $doc, $cat, 'cbc:TaxExemptionReason', (string) $g['reason'] );
+			}
 			$scheme = self::el( $doc, $cat, 'cac:TaxScheme' );
 			self::el( $doc, $scheme, 'cbc:ID', 'VAT' );
 		}
@@ -1170,6 +1563,21 @@ class OBLT_EInvoice {
 
 		// Delivery: the actual delivery date (BT-72) when known.
 		$htd = self::el( $doc, $tx, 'ram:ApplicableHeaderTradeDelivery' );
+		if ( self::needs_deliver_to( $d ) ) {
+			$ship = self::el( $doc, $htd, 'ram:ShipToTradeParty' );
+			$spa  = self::el( $doc, $ship, 'ram:PostalTradeAddress' );
+			$da   = isset( $d['deliver_addr'] ) && is_array( $d['deliver_addr'] ) ? $d['deliver_addr'] : array();
+			if ( ! empty( $da['postcode'] ) ) {
+				self::el( $doc, $spa, 'ram:PostcodeCode', (string) $da['postcode'] );
+			}
+			if ( ! empty( $da['street'] ) ) {
+				self::el( $doc, $spa, 'ram:LineOne', (string) $da['street'] );
+			}
+			if ( ! empty( $da['city'] ) ) {
+				self::el( $doc, $spa, 'ram:CityName', (string) $da['city'] );
+			}
+			self::el( $doc, $spa, 'ram:CountryID', (string) $d['deliver_to'] );
+		}
 		if ( ! empty( $d['delivery_date'] ) ) {
 			$ev  = self::el( $doc, $htd, 'ram:ActualDeliverySupplyChainEvent' );
 			$odt = self::el( $doc, $ev, 'ram:OccurrenceDateTime' );
@@ -1205,8 +1613,14 @@ class OBLT_EInvoice {
 			$tax = self::el( $doc, $hts, 'ram:ApplicableTradeTax' );
 			self::el( $doc, $tax, 'ram:CalculatedAmount', self::money( $g['tax'] ) );
 			self::el( $doc, $tax, 'ram:TypeCode', 'VAT' );
+			if ( ! empty( $g['reason_code'] ) ) {
+				self::el( $doc, $tax, 'ram:ExemptionReason', (string) $g['reason'] );
+			}
 			self::el( $doc, $tax, 'ram:BasisAmount', self::money( $g['taxable'] ) );
 			self::el( $doc, $tax, 'ram:CategoryCode', (string) $g['category'] );
+			if ( ! empty( $g['reason_code'] ) ) {
+				self::el( $doc, $tax, 'ram:ExemptionReasonCode', (string) $g['reason_code'] );
+			}
 			self::el( $doc, $tax, 'ram:RateApplicablePercent', self::money( $g['percent'] ) );
 		}
 		if ( ! empty( $d['payment_terms'] ) || ! empty( $d['due_date'] ) ) {

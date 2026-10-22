@@ -43,6 +43,19 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 			?>
 			· <?php echo esc_html( $oblt_order->get_date_created() ? $oblt_order->get_date_created()->date_i18n( get_option( 'date_format' ) ) : '' ); ?>
 		</div>
+		<?php
+		$oblt_inv_no   = (string) $oblt_order->get_meta( OBLT_Plugin::META_INVOICE_NUMBER );
+		$oblt_inv_date = $oblt_order->get_date_created() ? $oblt_order->get_date_created()->date_i18n( get_option( 'date_format' ) ) : '';
+		?>
+		<p class="oblt-cn-ref"><strong><?php
+		if ( '' !== $oblt_inv_no ) {
+			/* translators: 1: original invoice number, 2: invoice date. */
+			echo esc_html( sprintf( __( 'Corrects invoice %1$s of %2$s.', 'orderbay-lite' ), $oblt_inv_no, $oblt_inv_date ) );
+		} else {
+			/* translators: 1: order number, 2: order date. */
+			echo esc_html( sprintf( __( 'Refers to order #%1$s of %2$s.', 'orderbay-lite' ), $oblt_order->get_order_number(), $oblt_inv_date ) );
+		}
+		?></strong></p>
 		<div style="white-space:pre-line;margin-bottom:12px;"><strong><?php esc_html_e( 'From', 'orderbay-lite' ); ?></strong><br /><?php echo esc_html( $settings['from_lines'] ); ?></div>
 		<div style="margin-bottom:12px;"><strong><?php esc_html_e( 'Bill to', 'orderbay-lite' ); ?></strong><br /><?php echo wp_kses_post( $oblt_order->get_formatted_billing_address() ); ?></div>
 
@@ -65,16 +78,16 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 						foreach ( $oblt_items as $oblt_item ) {
 							?>
 							<tr>
-								<td><?php echo esc_html( $oblt_item->get_name() ); ?> × <?php echo esc_html( (string) abs( $oblt_item->get_quantity() ) ); ?></td>
-								<td class="num"><?php echo wp_kses_post( wc_price( abs( (float) $oblt_item->get_total() ), array( 'currency' => $oblt_order->get_currency() ) ) ); ?></td>
+								<td><?php echo esc_html( $oblt_item->get_name() ); ?><?php if ( 0 !== (int) abs( $oblt_item->get_quantity() ) ) : ?> × <?php echo esc_html( (string) abs( $oblt_item->get_quantity() ) ); ?><?php endif; ?></td>
+								<td class="num">−<?php echo wp_kses_post( wc_price( abs( (float) $oblt_item->get_total() ), array( 'currency' => $oblt_order->get_currency() ) ) ); ?></td>
 							</tr>
 							<?php
 						}
 					} else {
 						?>
 						<tr>
-							<td><?php echo esc_html( $oblt_refund->get_reason() ? $oblt_refund->get_reason() : __( 'Refund', 'orderbay-lite' ) ); ?></td>
-							<td class="num"><?php echo wp_kses_post( wc_price( abs( (float) $oblt_refund->get_amount() ), array( 'currency' => $oblt_order->get_currency() ) ) ); ?></td>
+							<td><?php /* translators: %s: refund reason or the word Refund. */ echo esc_html( sprintf( __( '%s (incl. tax)', 'orderbay-lite' ), $oblt_refund->get_reason() ? $oblt_refund->get_reason() : __( 'Refund', 'orderbay-lite' ) ) ); ?></td>
+							<td class="num">−<?php echo wp_kses_post( wc_price( abs( (float) $oblt_refund->get_amount() ), array( 'currency' => $oblt_order->get_currency() ) ) ); ?></td>
 						</tr>
 						<?php
 					}
@@ -93,14 +106,14 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 			$oblt_tax_refunded      = abs( (float) $oblt_order->get_total_tax_refunded() );
 			$oblt_shipping_refunded = abs( (float) $oblt_order->get_total_shipping_refunded() );
 			if ( $oblt_shipping_refunded > 0 ) {
-				echo '<div>' . esc_html__( 'Shipping refunded', 'orderbay-lite' ) . ': ' . wp_kses_post( wc_price( $oblt_shipping_refunded, array( 'currency' => $oblt_order->get_currency() ) ) ) . '</div>';
+				echo '<div>' . esc_html__( 'Shipping refunded', 'orderbay-lite' ) . ': −' . wp_kses_post( wc_price( $oblt_shipping_refunded, array( 'currency' => $oblt_order->get_currency() ) ) ) . '</div>';
 			}
 			if ( $oblt_tax_refunded > 0 ) {
-				echo '<div>' . esc_html__( 'Tax refunded', 'orderbay-lite' ) . ': ' . wp_kses_post( wc_price( $oblt_tax_refunded, array( 'currency' => $oblt_order->get_currency() ) ) ) . '</div>';
+				echo '<div>' . esc_html__( 'Tax refunded', 'orderbay-lite' ) . ': −' . wp_kses_post( wc_price( $oblt_tax_refunded, array( 'currency' => $oblt_order->get_currency() ) ) ) . '</div>';
 			}
 			?>
 			<div><strong><?php esc_html_e( 'Total credited', 'orderbay-lite' ); ?>:
-			<?php echo wp_kses_post( wc_price( $oblt_total_refunded, array( 'currency' => $oblt_order->get_currency() ) ) ); ?></strong></div>
+			−<?php echo wp_kses_post( wc_price( $oblt_total_refunded, array( 'currency' => $oblt_order->get_currency() ) ) ); ?></strong></div>
 		</div>
 		<?php if ( ! empty( $settings['footer_text'] ) ) : ?>
 			<div class="footer"><?php echo esc_html( $settings['footer_text'] ); ?></div>

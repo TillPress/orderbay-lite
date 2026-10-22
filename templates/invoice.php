@@ -55,6 +55,9 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 			<div><strong><?php esc_html_e( 'Bill to', 'orderbay-lite' ); ?></strong><?php echo wp_kses_post( $oblt_order->get_formatted_billing_address() ? $oblt_order->get_formatted_billing_address() : esc_html( $oblt_order->get_formatted_billing_full_name() ) ); ?>
 				<?php if ( $oblt_order->get_billing_email() ) : ?><br /><?php echo esc_html( $oblt_order->get_billing_email() ); ?><?php endif; ?>
 				<?php if ( $oblt_order->get_billing_phone() ) : ?><br /><?php echo esc_html( $oblt_order->get_billing_phone() ); ?><?php endif; ?>
+				<?php $oblt_tn = class_exists( 'OBLT_EInvoice' ) ? OBLT_EInvoice::invoice_tax_notes( $oblt_order ) : array( 'buyer_vat' => '', 'buyer_ref' => '', 'reasons' => array() ); ?>
+				<?php if ( '' !== $oblt_tn['buyer_vat'] ) : ?><br /><?php esc_html_e( 'VAT ID', 'orderbay-lite' ); ?>: <?php echo esc_html( $oblt_tn['buyer_vat'] ); ?><?php endif; ?>
+				<?php if ( '' !== $oblt_tn['buyer_ref'] ) : ?><br /><?php esc_html_e( 'Buyer reference', 'orderbay-lite' ); ?>: <?php echo esc_html( $oblt_tn['buyer_ref'] ); ?><?php endif; ?>
 			</div>
 			<?php $oblt_ship = $oblt_order->get_formatted_shipping_address(); ?>
 			<?php if ( $oblt_ship ) : ?>
@@ -110,7 +113,7 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 			<?php foreach ( $oblt_order->get_fees() as $oblt_fee_item ) : ?>
 				<div class="row"><span><?php echo esc_html( $oblt_fee_item->get_name() ); ?></span><span><?php echo wp_kses_post( wc_price( (float) $oblt_fee_item->get_total(), array( 'currency' => $oblt_order->get_currency() ) ) ); ?></span></div>
 			<?php endforeach; ?>
-			<div class="row grand"><span><?php esc_html_e( 'Total', 'orderbay-lite' ); ?></span><span><?php echo wp_kses_post( $oblt_order->get_formatted_order_total() ); ?></span></div>
+			<div class="row grand"><span><?php esc_html_e( 'Total', 'orderbay-lite' ); ?></span><span><?php echo wp_kses_post( $oblt_order->get_formatted_order_total( '', false ) ); ?></span></div>
 		</div>
 		<?php
 		$oblt_pay = class_exists( 'OBLT_EInvoice' ) ? OBLT_EInvoice::payment_summary( $oblt_order, (array) $settings ) : null;
@@ -121,8 +124,14 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 					<strong><?php esc_html_e( 'Payment', 'orderbay-lite' ); ?>:</strong>
 					<?php
 					if ( '' !== $oblt_pay['paid_on'] ) {
-						/* translators: 1: payment date, 2: payment method. */
-						echo esc_html( sprintf( __( 'Paid on %1$s (%2$s).', 'orderbay-lite' ), date_i18n( get_option( 'date_format' ), strtotime( $oblt_pay['paid_on'] ) ), $oblt_pay['method'] ) );
+						$oblt_pay_day = date_i18n( get_option( 'date_format' ), strtotime( $oblt_pay['paid_on'] ) );
+						if ( '' !== (string) $oblt_pay['method'] ) {
+							/* translators: 1: payment date, 2: payment method. */
+							echo esc_html( sprintf( __( 'Paid on %1$s (%2$s).', 'orderbay-lite' ), $oblt_pay_day, $oblt_pay['method'] ) );
+						} else {
+							/* translators: %s: payment date. */
+							echo esc_html( sprintf( __( 'Paid on %s.', 'orderbay-lite' ), $oblt_pay_day ) );
+						}
 					} else {
 						esc_html_e( 'Paid.', 'orderbay-lite' );
 					}
@@ -141,6 +150,9 @@ $oblt_paper = ( isset( $settings['paper'] ) && 'a4' === $settings['paper'] ) ? '
 				<?php endif; ?>
 			</div>
 		<?php endif; ?>
+		<?php foreach ( $oblt_tn['reasons'] as $oblt_tax_reason ) : ?>
+			<div class="notes vat-reason"><strong><?php echo esc_html( $oblt_tax_reason ); ?></strong></div>
+		<?php endforeach; ?>
 		<?php if ( $oblt_order->get_customer_note() ) : ?>
 			<div class="notes"><strong><?php esc_html_e( 'Customer note', 'orderbay-lite' ); ?>:</strong> <?php echo esc_html( $oblt_order->get_customer_note() ); ?></div>
 		<?php endif; ?>

@@ -79,7 +79,7 @@ class OBLT_Plugin {
 			'seller_country'  => '',
 			// PDF invoices in emails: on by default for these customer emails.
 			'email_attach_on' => '1',
-			'email_attach'    => array( 'customer_completed_order', 'customer_invoice' ),
+			'email_attach'    => array( 'customer_on_hold_order', 'customer_completed_order', 'customer_invoice' ),
 			// E-invoicing (Factur-X / ZUGFeRD, XRechnung).
 			'einv_contact'       => '',
 			'einv_phone'         => '',

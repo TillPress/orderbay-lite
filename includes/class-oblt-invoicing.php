@@ -1222,6 +1222,14 @@ class OBLT_Invoicing {
 			echo '<p><strong>' . esc_html__( 'Credit note #', 'orderbay-lite' ) . ':</strong> ' . esc_html( $cn ) . '</p>';
 		}
 		$has_refunds = $order->get_total_refunded() > 0 || count( $order->get_refunds() ) > 0;
+		if ( $has_refunds && ! $cn ) {
+			$issue = wp_nonce_url(
+				admin_url( 'admin-post.php?action=oblt_issue_credit_note&order_id=' . $order->get_id() ),
+				'oblt_issue_credit_note_' . $order->get_id()
+			);
+			echo '<div class="notice notice-warning inline" style="margin:6px 0;"><p>' . esc_html__( 'This order was refunded. Issue a credit note so the refund has its own numbered document for your books and your customer.', 'orderbay-lite' ) . '</p>';
+			echo '<p><a class="button button-primary" href="' . esc_url( $issue ) . '">' . esc_html__( 'Issue credit note', 'orderbay-lite' ) . '</a></p></div>';
+		}
 		if ( $has_refunds || $cn ) {
 			$url = wp_nonce_url(
 				admin_url( 'admin-post.php?action=oblt_print_credit_note&order_id=' . $order->get_id() ),

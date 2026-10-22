@@ -24,10 +24,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 class OBLT_Pdf {
 
 	/** Customer emails that get the invoice PDF out of the box. */
-	const DEFAULT_EMAILS = array( 'customer_completed_order', 'customer_invoice' );
+	const DEFAULT_EMAILS = array( 'customer_on_hold_order', 'customer_completed_order', 'customer_invoice' );
 
 	/** Emails offered in settings. new_order is the admin email and is never ticked by default. */
-	const OFFERED_EMAILS = array( 'customer_processing_order', 'customer_completed_order', 'customer_invoice', 'customer_refunded_order', 'new_order' );
+	const OFFERED_EMAILS = array( 'customer_on_hold_order', 'customer_processing_order', 'customer_completed_order', 'customer_invoice', 'customer_refunded_order', 'new_order' );
 
 	/** WooCommerce sends partial refunds under their own email id. */
 	const REFUND_EMAILS = array( 'customer_refunded_order', 'customer_partially_refunded_order' );

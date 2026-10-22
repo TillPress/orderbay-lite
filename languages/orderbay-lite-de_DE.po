@@ -1,0 +1,1745 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: orderbay-lite\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/orderbay-lite\n"
+"POT-Creation-Date: 2026-10-22T04:39:13+00:00\n"
+"PO-Revision-Date: 2026-10-22T04:39:13+00:00\n"
+"Last-Translator: \n"
+"Language-Team: German\n"
+"Language: de_DE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: orderbay-lite\n"
+
+#. Plugin Name of the plugin
+#: orderbay-lite.php includes/class-oblt-plugin.php:110
+msgid "OrderBay Lite"
+msgstr "OrderBay Lite"
+
+#. Plugin URI of the plugin
+#: orderbay-lite.php
+msgid "https://tillpress.com/orderbay/"
+msgstr "https://tillpress.com/orderbay/"
+
+#. Description of the plugin
+#: orderbay-lite.php
+msgid ""
+"Free WooCommerce invoices: PDF invoices attached to order emails, printable "
+"invoices, sequential invoice numbers, credit notes, customer My Account PDF "
+"download, and UBL 2.1 / Factur-X CII e-invoice XML export."
+msgstr ""
+"Kostenlose WooCommerce-Rechnungen: PDF-Rechnungen als Anhang von Bestell-E-"
+"Mails, druckbare Rechnungen, fortlaufende Rechnungsnummern, "
+"Rechnungskorrekturen, PDF-Download im Kundenkonto „Mein Konto“ sowie Export "
+"von E-Rechnungs-XML (UBL 2.1 / Factur-X CII)."
+
+#. Author of the plugin
+#: orderbay-lite.php
+msgid "Tillpress"
+msgstr "Tillpress"
+
+#. Author URI of the plugin
+#: orderbay-lite.php
+msgid "https://tillpress.com"
+msgstr "https://tillpress.com"
+
+#: includes/class-oblt-demo.php:69
+msgid "Demo: Linen apron"
+msgstr "Demo: Leinenschürze"
+
+#: includes/class-oblt-demo.php:70
+msgid "Demo: Ceramic pour-over set"
+msgstr "Demo: Keramik-Set für Handfilterkaffee"
+
+#. translators: 1: item name, 2: quantity.
+#: includes/class-oblt-demo.php:75
+#, php-format
+msgid "%1$s x %2$d"
+msgstr "%1$s x %2$d"
+
+#: includes/class-oblt-demo.php:93
+msgid "Demo (no payment taken)"
+msgstr "Demo (keine Zahlung erfolgt)"
+
+#: includes/class-oblt-demo.php:98
+msgid ""
+"OrderBay Lite demo order. Uses DEMO- numbers; your real invoice counter is "
+"unchanged. Remove it from WooCommerce > OrderBay Lite help."
+msgstr ""
+"OrderBay-Lite-Demobestellung. Verwendet DEMO-Nummern; Ihr tatsächlicher "
+"Rechnungszähler bleibt unverändert. Sie können sie unter WooCommerce > "
+"OrderBay Lite Hilfe entfernen."
+
+#: includes/class-oblt-demo.php:106
+msgid "Demo: one apron returned"
+msgstr "Demo: eine Schürze zurückgegeben"
+
+#. translators: %s: order number.
+#: includes/class-oblt-demo.php:187
+#, php-format
+msgid "Open demo order #%s (Invoice, UBL, CII buttons)"
+msgstr "Demobestellung #%s öffnen (Schaltflächen Rechnung, UBL, CII)"
+
+#: includes/class-oblt-demo.php:191
+msgid "Print the demo invoice (DEMO-INV-0001)"
+msgstr "Demo-Rechnung drucken (DEMO-INV-0001)"
+
+#: includes/class-oblt-demo.php:196
+msgid "Print the demo credit note (DEMO-CN-0001)"
+msgstr "Demo-Rechnungskorrektur drucken (DEMO-CN-0001)"
+
+#: includes/class-oblt-demo.php:202
+msgid "Download demo UBL 2.1 XML"
+msgstr "Demo-UBL-2.1-XML herunterladen"
+
+#: includes/class-oblt-demo.php:206
+msgid "Download demo CII (Factur-X) XML"
+msgstr "Demo-CII-XML (Factur-X) herunterladen"
+
+#: includes/class-oblt-demo.php:212
+msgid "Invoice settings (business details, number format)"
+msgstr "Rechnungseinstellungen (Firmendaten, Nummernformat)"
+
+#: includes/class-oblt-demo.php:222
+msgid ""
+"The invoice uses your business details from the settings page. Fill those in"
+" first to see a complete invoice and a compliant e-invoice."
+msgstr ""
+"Die Rechnung verwendet Ihre Firmendaten aus den Einstellungen. Tragen Sie "
+"diese zuerst ein, um eine vollständige Rechnung und eine konforme E-Rechnung"
+" zu sehen."
+
+#: includes/class-oblt-documents.php:132 includes/class-oblt-documents.php:451
+#: includes/class-oblt-documents.php:484 includes/class-oblt-documents.php:521
+#: includes/class-oblt-einvoice.php:284 includes/class-oblt-einvoice.php:349
+#: includes/class-oblt-invoicing.php:1262
+#: includes/class-oblt-invoicing.php:1278
+msgid "Forbidden"
+msgstr "Zugriff verweigert"
+
+#: includes/class-oblt-documents.php:136 includes/class-oblt-plugin.php:109
+msgid "OrderBay Lite invoices"
+msgstr "OrderBay-Lite-Rechnungen"
+
+#: includes/class-oblt-documents.php:137
+msgid ""
+"Invoices print from the browser (Print / Save as PDF) and download as PDF "
+"files made on your own server by the bundled Dompdf engine. Nothing is sent "
+"to an outside service."
+msgstr ""
+"Rechnungen werden im Browser gedruckt (Drucken / Als PDF speichern) und als "
+"PDF-Dateien heruntergeladen, die auf Ihrem eigenen Server von der "
+"mitgelieferten Dompdf-Engine erzeugt werden. Es werden keine Daten an "
+"externe Dienste gesendet."
+
+#: includes/class-oblt-documents.php:138
+msgid ""
+"Not tax advice. Invoice layout, numbering, VAT lines, and e-invoice files "
+"are tools — confirm legal requirements with your accountant or tax adviser "
+"before using them in production."
+msgstr ""
+"Keine Steuerberatung. Rechnungslayout, Nummerierung, USt.-Zeilen und "
+"E-Rechnungsdateien sind Hilfsmittel – klären Sie die rechtlichen "
+"Anforderungen mit Ihrem Steuerberater ab, bevor Sie sie produktiv einsetzen."
+
+#: includes/class-oblt-documents.php:141
+msgid "Business details & appearance"
+msgstr "Firmendaten & Darstellung"
+
+#: includes/class-oblt-documents.php:143
+msgid "Logo URL"
+msgstr "Logo-URL"
+
+#: includes/class-oblt-documents.php:145
+msgid "Business name / address"
+msgstr "Firmenname / Anschrift"
+
+#: includes/class-oblt-documents.php:147
+msgid "Footer text"
+msgstr "Fußzeilentext"
+
+#: includes/class-oblt-documents.php:149
+msgid "Paper size"
+msgstr "Papierformat"
+
+#: includes/class-oblt-documents.php:154
+msgid "Company VAT / Tax ID"
+msgstr "USt-IdNr. / Steuernummer des Unternehmens"
+
+#: includes/class-oblt-documents.php:156 includes/class-oblt-einvoice.php:75
+msgid "Peppol ID"
+msgstr "Peppol-ID"
+
+#: includes/class-oblt-documents.php:158
+msgid ""
+"Scheme and ID, for example 0208:0123456789. Blank = worked out from the VAT "
+"number."
+msgstr ""
+"Schema und ID, zum Beispiel 0208:0123456789. Leer = wird aus der USt-IdNr. "
+"abgeleitet."
+
+#: includes/class-oblt-documents.php:159
+msgid "Seller country (ISO)"
+msgstr "Land des Verkäufers (ISO)"
+
+#: includes/class-oblt-documents.php:161
+msgid "For e-invoicing. Blank = WooCommerce store country."
+msgstr "Für die E-Rechnung. Leer = Land des WooCommerce-Shops."
+
+#: includes/class-oblt-documents.php:164
+msgid "PDF invoices in emails"
+msgstr "PDF-Rechnungen in E-Mails"
+
+#: includes/class-oblt-documents.php:166
+msgid "Attach PDF invoice to emails"
+msgstr "PDF-Rechnung an E-Mails anhängen"
+
+#: includes/class-oblt-documents.php:168
+msgid "Attach the invoice PDF to the WooCommerce emails ticked below"
+msgstr ""
+"Die Rechnungs-PDF an die unten angehakten WooCommerce-E-Mails anhängen"
+
+#: includes/class-oblt-documents.php:171
+msgid "Processing order (customer)"
+msgstr "Bestellung in Bearbeitung (Kunde)"
+
+#: includes/class-oblt-documents.php:172
+msgid "Completed order (customer)"
+msgstr "Abgeschlossene Bestellung (Kunde)"
+
+#: includes/class-oblt-documents.php:173
+msgid "Customer invoice / Order details (customer)"
+msgstr "Kundenrechnung / Bestelldetails (Kunde)"
+
+#: includes/class-oblt-documents.php:174
+msgid ""
+"Refunded order (customer): attaches the credit note PDF when the order has a"
+" credit note number"
+msgstr ""
+"Erstattete Bestellung (Kunde): hängt die Rechnungskorrektur als PDF an, wenn"
+" die Bestellung eine Rechnungskorrekturnummer hat"
+
+#: includes/class-oblt-documents.php:175
+msgid "New order (admin)"
+msgstr "Neue Bestellung (Admin)"
+
+#: includes/class-oblt-documents.php:185
+msgid ""
+"The invoice number is assigned when the first PDF is attached, if the order "
+"does not have one yet. If a PDF cannot be made, the email is still sent "
+"without it and the reason is logged under WooCommerce → Status → Logs "
+"(source: orderbay-lite)."
+msgstr ""
+"Die Rechnungsnummer wird vergeben, wenn das erste PDF angehängt wird, sofern"
+" die Bestellung noch keine hat. Kann ein PDF nicht erstellt werden, wird die"
+" E-Mail trotzdem ohne PDF versendet und der Grund unter WooCommerce → Status"
+" → Protokolle protokolliert (Quelle: orderbay-lite)."
+
+#: includes/class-oblt-documents.php:187
+msgid ""
+"PDFs need the PHP mbstring and dom extensions, which this server does not "
+"have. Emails are sent without a PDF until they are enabled."
+msgstr ""
+"Für PDFs werden die PHP-Erweiterungen mbstring und dom benötigt, die auf "
+"diesem Server fehlen. E-Mails werden ohne PDF versendet, bis sie aktiviert "
+"sind."
+
+#: includes/class-oblt-documents.php:193
+msgid "E-invoicing (Factur-X / ZUGFeRD, XRechnung, UBL)"
+msgstr "E-Rechnung (Factur-X / ZUGFeRD, XRechnung, UBL)"
+
+#: includes/class-oblt-documents.php:194
+msgid ""
+"The order screen has a Factur-X / ZUGFeRD PDF (a normal-looking PDF/A-3 "
+"invoice with the invoice data inside, for France and Germany), XRechnung XML"
+" (German public buyers), and UBL (Peppol BIS 3.0) or CII XML. Export only: "
+"OrderBay Lite does not connect to the Peppol network or any PDP/access "
+"point. Our sample invoices pass the official KoSIT and Mustang validators; "
+"check one real order through a validator before relying on it."
+msgstr ""
+"Auf der Bestellseite stehen eine Factur-X-/ZUGFeRD-PDF (eine normal "
+"aussehende PDF/A-3-Rechnung mit eingebetteten Rechnungsdaten, für Frankreich"
+" und Deutschland), XRechnung-XML (deutsche öffentliche Auftraggeber) sowie "
+"UBL- (Peppol BIS 3.0) oder CII-XML zur Verfügung. Nur Export: OrderBay Lite "
+"stellt keine Verbindung zum Peppol-Netzwerk oder zu einem PDP/Access-Point "
+"her. Unsere Beispielrechnungen bestehen die offiziellen Validatoren von "
+"KoSIT und Mustang; prüfen Sie eine echte Bestellung mit einem Validator, "
+"bevor Sie sich darauf verlassen."
+
+#: includes/class-oblt-documents.php:198
+msgid "Seller details needed for compliant e-invoices:"
+msgstr "Für konforme E-Rechnungen erforderliche Angaben zum Verkäufer:"
+
+#: includes/class-oblt-documents.php:204
+msgid "Seller details look complete for e-invoicing."
+msgstr "Die Angaben zum Verkäufer sind für die E-Rechnung vollständig."
+
+#: includes/class-oblt-documents.php:208
+msgid "Invoice & credit note numbers"
+msgstr "Rechnungs- und Korrekturnummern"
+
+#: includes/class-oblt-documents.php:209
+msgid ""
+"Format tokens: {PREFIX} {YYYY} {YY} {MM} {DD} {SEQ} {SEQ:5} (zero-padded). "
+"Default {PREFIX}{SEQ} keeps existing numbers. A sequence token is always "
+"enforced. Yearly/monthly reset restarts the counter at 1 each period."
+msgstr ""
+"Formatplatzhalter: {PREFIX} {YYYY} {YY} {MM} {DD} {SEQ} {SEQ:5} (mit "
+"führenden Nullen). Das Standardformat {PREFIX}{SEQ} behält bestehende "
+"Nummern bei. Ein Zähler-Platzhalter ist immer erforderlich. Bei "
+"jährlichem/monatlichem Zurücksetzen beginnt der Zähler in jeder Periode "
+"wieder bei 1."
+
+#: includes/class-oblt-documents.php:211
+msgid "Invoice prefix"
+msgstr "Rechnungspräfix"
+
+#: includes/class-oblt-documents.php:212
+msgid "Next invoice #"
+msgstr "Nächste Rechnungsnr."
+
+#: includes/class-oblt-documents.php:213 includes/class-oblt-documents.php:369
+#: includes/class-oblt-documents.php:401
+#: includes/class-oblt-invoicing.php:1351 templates/invoice.php:16
+msgid "Invoice"
+msgstr "Rechnung"
+
+#: includes/class-oblt-documents.php:214
+msgid "Credit note prefix"
+msgstr "Präfix für Rechnungskorrekturen"
+
+#: includes/class-oblt-documents.php:215
+msgid "Next credit #"
+msgstr "Nächste Rechnungskorrektur-Nr."
+
+#: includes/class-oblt-documents.php:216 templates/credit-note.php:16
+#: templates/credit-note.php:36
+msgid "Credit note"
+msgstr "Rechnungskorrektur"
+
+#: includes/class-oblt-documents.php:221
+msgid "Save invoice settings"
+msgstr "Rechnungseinstellungen speichern"
+
+#: includes/class-oblt-documents.php:223
+msgid "Template customization"
+msgstr "Anpassung der Vorlagen"
+
+#: includes/class-oblt-documents.php:224
+msgid ""
+"Override any document template without editing the plugin: copy a file from "
+"the plugin's templates/ folder into your theme at wp-content/themes/your-"
+"theme/orderbay-lite/ (e.g. orderbay-lite/invoice.php). Your copy survives "
+"plugin updates. The oblt_before_document / oblt_after_document actions and "
+"the oblt_locate_template filter are also available."
+msgstr ""
+"Sie können jede Dokumentvorlage überschreiben, ohne das Plugin zu "
+"bearbeiten: Kopieren Sie eine Datei aus dem Ordner templates/ des Plugins in"
+" Ihr Theme nach wp-content/themes/ihr-theme/orderbay-lite/ (z. B. orderbay-"
+"lite/invoice.php). Ihre Kopie bleibt bei Plugin-Updates erhalten. Die "
+"Actions oblt_before_document / oblt_after_document und der Filter "
+"oblt_locate_template stehen ebenfalls zur Verfügung."
+
+#. translators: %s: document type.
+#: includes/class-oblt-documents.php:242
+#, php-format
+msgid "%s number format"
+msgstr "Nummernformat für %s"
+
+#. translators: %s: document type.
+#: includes/class-oblt-documents.php:245
+#, php-format
+msgid "%s counter reset"
+msgstr "Zähler-Zurücksetzung für %s"
+
+#: includes/class-oblt-documents.php:248
+msgid "Never (continuous)"
+msgstr "Nie (fortlaufend)"
+
+#: includes/class-oblt-documents.php:249
+msgid "Yearly (restart at 1 each year)"
+msgstr "Jährlich (jedes Jahr bei 1 neu beginnen)"
+
+#: includes/class-oblt-documents.php:250
+msgid "Monthly (restart at 1 each month)"
+msgstr "Monatlich (jeden Monat bei 1 neu beginnen)"
+
+#: includes/class-oblt-documents.php:282 templates/invoice.php:108
+msgid "Tax"
+msgstr "Steuer"
+
+#: includes/class-oblt-documents.php:351
+msgid "OrderBay Lite: print invoice"
+msgstr "OrderBay Lite: Rechnung drucken"
+
+#. translators: %s: invoice print URL.
+#: includes/class-oblt-documents.php:357
+#, php-format
+msgid "OrderBay Lite invoice: %s"
+msgstr "OrderBay-Lite-Rechnung: %s"
+
+#: includes/class-oblt-documents.php:366
+#: includes/class-oblt-invoicing.php:1218
+msgid "Invoice #"
+msgstr "Rechnungsnr."
+
+#: includes/class-oblt-documents.php:370 includes/class-oblt-documents.php:407
+#: templates/packing-slip.php:18
+msgid "Packing slip"
+msgstr "Lieferschein"
+
+#: includes/class-oblt-documents.php:372
+#: includes/class-oblt-invoicing.php:1371
+msgid "Download PDF"
+msgstr "PDF herunterladen"
+
+#: includes/class-oblt-documents.php:376
+msgid "ZUGFeRD PDF (XRechnung)"
+msgstr "ZUGFeRD-PDF (XRechnung)"
+
+#: includes/class-oblt-documents.php:376
+msgid "Factur-X / ZUGFeRD PDF"
+msgstr "Factur-X-/ZUGFeRD-PDF"
+
+#: includes/class-oblt-documents.php:379
+msgid "XRechnung XML"
+msgstr "XRechnung-XML"
+
+#: includes/class-oblt-documents.php:380
+msgid "E-invoice UBL"
+msgstr "E-Rechnung UBL"
+
+#: includes/class-oblt-documents.php:381
+msgid "E-invoice CII (Factur-X)"
+msgstr "E-Rechnung CII (Factur-X)"
+
+#: includes/class-oblt-documents.php:387
+msgid "E-invoice XML is a draft — not fully compliant yet:"
+msgstr ""
+"Die E-Rechnungs-XML ist ein Entwurf und noch nicht vollständig konform:"
+
+#: includes/class-oblt-documents.php:402
+msgid "Inv"
+msgstr "Rg."
+
+#: includes/class-oblt-documents.php:408
+msgid "Slip"
+msgstr "Lief."
+
+#: includes/class-oblt-documents.php:414
+msgid "Download PDF invoice"
+msgstr "PDF-Rechnung herunterladen"
+
+#: includes/class-oblt-documents.php:415
+msgid "PDF"
+msgstr "PDF"
+
+#: includes/class-oblt-documents.php:457 includes/class-oblt-documents.php:490
+#: includes/class-oblt-documents.php:527 includes/class-oblt-einvoice.php:294
+#: includes/class-oblt-einvoice.php:360 includes/class-oblt-invoicing.php:1268
+#: includes/class-oblt-invoicing.php:1284
+msgid "Order not found"
+msgstr "Bestellung nicht gefunden"
+
+#: includes/class-oblt-documents.php:463
+msgid ""
+"An invoice number could not be allocated. The document was not rendered."
+msgstr ""
+"Es konnte keine Rechnungsnummer vergeben werden. Das Dokument wurde nicht "
+"erzeugt."
+
+#: includes/class-oblt-documents.php:532
+msgid "The PDF could not be made:"
+msgstr "Das PDF konnte nicht erstellt werden:"
+
+#: includes/class-oblt-einvoice.php:69
+msgid "VAT number"
+msgstr "USt-IdNr."
+
+#: includes/class-oblt-einvoice.php:82 includes/class-oblt-einvoice.php:129
+#: includes/class-oblt-einvoice.php:163
+msgid "Buyer reference / Leitweg-ID"
+msgstr "Käuferreferenz / Leitweg-ID"
+
+#: includes/class-oblt-einvoice.php:85
+msgid ""
+"Goes into the e-invoice as BT-10. German public buyers need their Leitweg-ID"
+" here; otherwise the order number is used."
+msgstr ""
+"Wird als BT-10 in die E-Rechnung übernommen. Öffentliche Auftraggeber in "
+"Deutschland tragen hier ihre Leitweg-ID ein; andernfalls wird die "
+"Bestellnummer verwendet."
+
+#: includes/class-oblt-einvoice.php:290
+msgid ""
+"Factur-X needs the bundled PDF engine (Dompdf 3). Another plugin loaded an "
+"older Dompdf first."
+msgstr ""
+"Für Factur-X wird die mitgelieferte PDF-Engine (Dompdf 3) benötigt. Ein "
+"anderes Plugin hat zuvor eine ältere Dompdf-Version geladen."
+
+#: includes/class-oblt-einvoice.php:299 includes/class-oblt-einvoice.php:365
+msgid ""
+"An invoice number could not be allocated. The document was not exported."
+msgstr ""
+"Es konnte keine Rechnungsnummer vergeben werden. Das Dokument wurde nicht "
+"exportiert."
+
+#: includes/class-oblt-einvoice.php:306
+msgid "Factur-X assembly failed: "
+msgstr "Factur-X-Erzeugung fehlgeschlagen: "
+
+#: includes/class-oblt-einvoice.php:456
+msgid "Seller address and email in e-invoices"
+msgstr "Anschrift und E-Mail-Adresse des Verkäufers in E-Rechnungen"
+
+#: includes/class-oblt-einvoice.php:457
+msgid "(no store address set)"
+msgstr "(keine Shop-Adresse hinterlegt)"
+
+#. translators: 1: link to WooCommerce general settings, 2: link to
+#. WooCommerce email settings.
+#: includes/class-oblt-einvoice.php:461
+#, php-format
+msgid ""
+"E-invoices (Factur-X, XRechnung, UBL, CII) need a structured address, so "
+"they take it from the %1$s and the email from the %2$s, not from the From "
+"name/address box above."
+msgstr ""
+"E-Rechnungen (Factur-X, XRechnung, UBL, CII) benötigen eine strukturierte "
+"Anschrift. Sie übernehmen sie daher aus der %1$s und die E-Mail-Adresse aus "
+"der %2$s, nicht aus dem oben stehenden Feld „Absendername/-adresse“."
+
+#: includes/class-oblt-einvoice.php:462
+msgid "WooCommerce store address"
+msgstr "WooCommerce-Shop-Adresse"
+
+#: includes/class-oblt-einvoice.php:463
+msgid "WooCommerce email \"From\" address"
+msgstr "WooCommerce-E-Mail-Absenderadresse („From“)"
+
+#: includes/class-oblt-einvoice.php:467
+msgid ""
+"The From name/address above does not contain your WooCommerce store street "
+"or postcode, so your printed invoice and your e-invoice show different "
+"addresses. Make them match before sending e-invoices."
+msgstr ""
+"Der oben angegebene Absendername bzw. die Absenderadresse enthält weder "
+"Straße noch Postleitzahl Ihres WooCommerce-Shops, daher zeigen Ihre "
+"gedruckte Rechnung und Ihre E-Rechnung unterschiedliche Adressen. Gleichen "
+"Sie beide an, bevor Sie E-Rechnungen versenden."
+
+#: includes/class-oblt-einvoice.php:471
+msgid "Factur-X / ZUGFeRD PDF profile"
+msgstr "Factur-X-/ZUGFeRD-PDF-Profil"
+
+#: includes/class-oblt-einvoice.php:473
+msgid "EN 16931 (Factur-X / ZUGFeRD, most buyers)"
+msgstr "EN 16931 (Factur-X / ZUGFeRD, für die meisten Empfänger)"
+
+#: includes/class-oblt-einvoice.php:474
+msgid "XRechnung (German public sector)"
+msgstr "XRechnung (deutsche öffentliche Verwaltung)"
+
+#: includes/class-oblt-einvoice.php:476
+msgid "Emailed invoices"
+msgstr "Per E-Mail versendete Rechnungen"
+
+#: includes/class-oblt-einvoice.php:477
+msgid "Attach the Factur-X / ZUGFeRD PDF instead of the plain invoice PDF"
+msgstr "Factur-X-/ZUGFeRD-PDF statt der einfachen Rechnungs-PDF anhängen"
+
+#: includes/class-oblt-einvoice.php:478
+msgid ""
+"Customers see the same invoice; their accounting software can read the data "
+"inside it."
+msgstr ""
+"Ihre Kunden sehen dieselbe Rechnung; ihre Buchhaltungssoftware kann die "
+"darin eingebetteten Daten auslesen."
+
+#: includes/class-oblt-einvoice.php:489
+msgid "Invoice contact name"
+msgstr "Ansprechpartner auf der Rechnung"
+
+#: includes/class-oblt-einvoice.php:489
+msgid "Shown as the seller contact. Leave empty to use the company name."
+msgstr ""
+"Wird als Ansprechpartner des Verkäufers angezeigt. Leer lassen, um den "
+"Firmennamen zu verwenden."
+
+#: includes/class-oblt-einvoice.php:490
+msgid "Invoice contact phone"
+msgstr "Telefonnummer des Ansprechpartners auf der Rechnung"
+
+#: includes/class-oblt-einvoice.php:490
+msgid "Required for XRechnung."
+msgstr "Erforderlich für XRechnung."
+
+#: includes/class-oblt-einvoice.php:491
+msgid "IBAN for bank transfer"
+msgstr "IBAN für Überweisungen"
+
+#: includes/class-oblt-einvoice.php:491
+msgid ""
+"Optional. When set, unpaid invoices ask for a SEPA transfer to this account."
+msgstr ""
+"Optional. Wenn angegeben, werden bei unbezahlten Rechnungen SEPA-"
+"Überweisungen auf dieses Konto angefordert."
+
+#: includes/class-oblt-einvoice.php:492
+msgid "BIC"
+msgstr "BIC"
+
+#: includes/class-oblt-einvoice.php:493
+msgid "Account holder"
+msgstr "Kontoinhaber"
+
+#: includes/class-oblt-einvoice.php:494
+msgid "Payment due after (days)"
+msgstr "Zahlungsziel (Tage)"
+
+#: includes/class-oblt-einvoice.php:496
+msgid "For orders not paid yet. Paid orders show the payment and nothing due."
+msgstr ""
+"Für noch nicht bezahlte Bestellungen. Bei bezahlten Bestellungen wird die "
+"Zahlung angezeigt und kein Betrag als fällig ausgewiesen."
+
+#: includes/class-oblt-einvoice.php:680 templates/invoice.php:94
+msgid "Shipping"
+msgstr "Versand"
+
+#. translators: 1: payment date, 2: payment method
+#. translators: 1: payment date, 2: payment method.
+#: includes/class-oblt-einvoice.php:759 templates/invoice.php:128
+#, php-format
+msgid "Paid on %1$s (%2$s)."
+msgstr "Bezahlt am %1$s (%2$s)."
+
+#. translators: 1: payment date, 2: payment method
+#: includes/class-oblt-einvoice.php:759
+msgid "online"
+msgstr "online"
+
+#: includes/class-oblt-einvoice.php:760 templates/invoice.php:130
+msgid "Paid."
+msgstr "Bezahlt."
+
+#. translators: %s: due date
+#: includes/class-oblt-einvoice.php:763
+#, php-format
+msgid "Payment due by %s."
+msgstr "Zahlbar bis %s."
+
+#: includes/class-oblt-einvoice.php:908
+msgid "SEPA credit transfer"
+msgstr "SEPA-Überweisung"
+
+#: includes/class-oblt-einvoice.php:1074
+msgid "Seller name is missing (set From name/address in Documents settings)."
+msgstr ""
+"Der Name des Verkäufers fehlt (Absendername/-adresse in den "
+"Dokumenteinstellungen festlegen)."
+
+#: includes/class-oblt-einvoice.php:1077
+msgid ""
+"Seller postal address is incomplete (set the WooCommerce store address)."
+msgstr ""
+"Die Anschrift des Verkäufers ist unvollständig (WooCommerce-Shop-Adresse "
+"festlegen)."
+
+#: includes/class-oblt-einvoice.php:1080
+msgid "Seller country code is missing or invalid."
+msgstr "Der Ländercode des Verkäufers fehlt oder ist ungültig."
+
+#: includes/class-oblt-einvoice.php:1083
+msgid ""
+"Seller VAT / Tax ID is missing (set Company VAT / Tax ID in Documents "
+"settings)."
+msgstr ""
+"Die USt-IdNr./Steuernummer des Verkäufers fehlt (USt-IdNr. / Steuernummer "
+"des Unternehmens in den Dokumenteinstellungen festlegen)."
+
+#: includes/class-oblt-einvoice.php:1085
+msgid ""
+"Seller Peppol ID is missing and can't be worked out from the VAT number (set"
+" Peppol ID in Documents settings)."
+msgstr ""
+"Die Peppol-ID des Verkäufers fehlt und kann nicht aus der USt-IdNr. "
+"abgeleitet werden (Peppol-ID in den Dokumenteinstellungen festlegen)."
+
+#: includes/class-oblt-einvoice.php:1088
+msgid "The IBAN in Documents settings is not valid."
+msgstr "Die IBAN in den Dokumenteinstellungen ist ungültig."
+
+#: includes/class-oblt-einvoice.php:1104
+msgid "Invoice currency is missing."
+msgstr "Die Rechnungswährung fehlt."
+
+#: includes/class-oblt-einvoice.php:1107
+msgid "Buyer country code is missing or invalid."
+msgstr "Der Ländercode des Käufers fehlt oder ist ungültig."
+
+#: includes/class-oblt-einvoice.php:1110
+msgid ""
+"Buyer Peppol ID is missing and can't be worked out from their VAT number."
+msgstr ""
+"Die Peppol-ID des Käufers fehlt und kann nicht aus seiner USt-IdNr. "
+"abgeleitet werden."
+
+#: includes/class-oblt-einvoice.php:1113
+msgid "Invoice has no lines."
+msgstr "Die Rechnung enthält keine Positionen."
+
+#: includes/class-oblt-einvoice.php:1124
+msgid ""
+"Invoice totals do not reconcile (line extension + tax ≠ tax-inclusive "
+"amount)."
+msgstr ""
+"Die Rechnungssummen stimmen nicht überein (Summe der Positionen + Steuer ≠ "
+"Bruttobetrag)."
+
+#: includes/class-oblt-einvoice.php:1141
+msgid ""
+"XRechnung needs a seller contact phone number (set it under E-invoicing in "
+"Documents settings)."
+msgstr ""
+"XRechnung erfordert eine Telefonnummer des Ansprechpartners beim Verkäufer "
+"(unter „E-Rechnung“ in den Dokumenteinstellungen festlegen)."
+
+#: includes/class-oblt-einvoice.php:1144
+msgid "XRechnung needs a seller contact email (the WooCommerce \"From\" address)."
+msgstr ""
+"XRechnung erfordert eine E-Mail-Adresse des Ansprechpartners beim Verkäufer "
+"(die WooCommerce-Absenderadresse „From“)."
+
+#: includes/class-oblt-einvoice.php:1147
+msgid "XRechnung needs the buyer's city and postcode."
+msgstr "XRechnung erfordert Ort und Postleitzahl des Käufers."
+
+#: includes/class-oblt-einvoice.php:1150
+msgid "XRechnung needs the buyer's email or Peppol ID."
+msgstr ""
+"XRechnung erfordert die E-Mail-Adresse oder die Peppol-ID des Käufers."
+
+#: includes/class-oblt-einvoice.php:1153
+msgid "XRechnung needs a buyer reference (Leitweg-ID for public buyers)."
+msgstr ""
+"XRechnung erfordert eine Käuferreferenz (Leitweg-ID bei öffentlichen "
+"Auftraggebern)."
+
+#: includes/class-oblt-einvoice.php:1157
+msgid "SEPA credit transfer needs an IBAN."
+msgstr "Für eine SEPA-Überweisung ist eine IBAN erforderlich."
+
+#: includes/class-oblt-hub.php:76 includes/class-oblt-hub.php:282
+msgid "OrderBay Lite help & demo"
+msgstr "OrderBay Lite – Hilfe & Demo"
+
+#: includes/class-oblt-hub.php:77
+msgid "OrderBay Lite help"
+msgstr "OrderBay Lite – Hilfe"
+
+#: includes/class-oblt-hub.php:101
+msgid "Help & demo"
+msgstr "Hilfe & Demo"
+
+#: includes/class-oblt-hub.php:211 includes/class-oblt-support.php:266
+msgid "You do not have permission to do that."
+msgstr "Sie haben dafür keine Berechtigung."
+
+#: includes/class-oblt-hub.php:264
+msgid "Demo data created."
+msgstr "Demodaten wurden erstellt."
+
+#: includes/class-oblt-hub.php:265
+msgid "Demo data removed."
+msgstr "Demodaten wurden entfernt."
+
+#: includes/class-oblt-hub.php:266
+msgid ""
+"Demo data could not be created. Check that WooCommerce is active, then try "
+"again."
+msgstr ""
+"Die Demodaten konnten nicht erstellt werden. Prüfen Sie, ob WooCommerce "
+"aktiv ist, und versuchen Sie es erneut."
+
+#: includes/class-oblt-hub.php:267
+msgid "Offer hidden. It will not show again for your account."
+msgstr "Angebot ausgeblendet. Es wird für Ihr Konto nicht mehr angezeigt."
+
+#: includes/class-oblt-hub.php:279
+msgid "You do not have permission to view this page."
+msgstr "Sie haben keine Berechtigung, diese Seite anzuzeigen."
+
+#: includes/class-oblt-hub.php:287
+msgid "Try it with demo data"
+msgstr "Mit Demodaten ausprobieren"
+
+#: includes/class-oblt-hub.php:288
+msgid ""
+"Creates one completed demo order with an invoice number from a separate "
+"DEMO- sequence, so you can open the invoice, the UBL and CII e-invoice XML, "
+"and a credit note without touching your real invoice numbers."
+msgstr ""
+"Erstellt eine abgeschlossene Demobestellung mit einer Rechnungsnummer aus "
+"einem separaten DEMO-Nummernkreis. So können Sie die Rechnung, die UBL- und "
+"CII-E-Rechnungs-XML sowie eine Rechnungskorrektur öffnen, ohne Ihre echten "
+"Rechnungsnummern zu berühren."
+
+#: includes/class-oblt-hub.php:296
+msgid "Remove demo data"
+msgstr "Demodaten entfernen"
+
+#: includes/class-oblt-hub.php:298
+msgid "Create demo data"
+msgstr "Demodaten erstellen"
+
+#: includes/class-oblt-hub.php:300
+msgid ""
+"Demo data is labelled \"Demo\", is never emailed or texted, and is deleted "
+"with one click here (and when you uninstall the plugin)."
+msgstr ""
+"Demodaten sind mit „Demo“ gekennzeichnet, werden nie per E-Mail oder SMS "
+"versendet und lassen sich hier mit einem Klick löschen (ebenso bei der "
+"Deinstallation des Plugins)."
+
+#: includes/class-oblt-hub.php:304
+msgid "Get support"
+msgstr "Support erhalten"
+
+#: includes/class-oblt-hub.php:305
+msgid ""
+"Send a ticket straight to the Tillpress team from here. You get a ticket "
+"number right away and the reply comes by email. Nothing is sent until you "
+"tick the consent box and press Send."
+msgstr ""
+"Senden Sie von hier aus ein Ticket direkt an das Tillpress-Team. Sie "
+"erhalten sofort eine Ticketnummer, die Antwort kommt per E-Mail. Es wird "
+"nichts gesendet, bevor Sie das Einwilligungsfeld anhaken und auf „Senden“ "
+"klicken."
+
+#: includes/class-oblt-hub.php:307
+msgid "Other ways to reach us:"
+msgstr "Weitere Kontaktmöglichkeiten:"
+
+#: includes/class-oblt-hub.php:308
+msgid "Documentation"
+msgstr "Dokumentation"
+
+#: includes/class-oblt-hub.php:309
+msgid "WordPress.org support forum"
+msgstr "WordPress.org-Support-Forum"
+
+#: includes/class-oblt-hub.php:310
+msgid "Support form on tillpress.com"
+msgstr "Support-Formular auf tillpress.com"
+
+#: includes/class-oblt-hub.php:316
+msgid "OrderBay: 20% off for OrderBay Lite users"
+msgstr "OrderBay: 20 % Rabatt für OrderBay-Lite-Nutzer"
+
+#: includes/class-oblt-hub.php:317
+msgid ""
+"Adds delivery notes, shipping labels, proforma invoices, pick lists, bulk "
+"printing, barcodes/QR, and a fulfillment desk."
+msgstr ""
+"Ergänzt Lieferscheine, Versandetiketten, Proformarechnungen, Picklisten, "
+"Massendruck, Barcodes/QR-Codes und einen Fulfillment-Arbeitsplatz."
+
+#: includes/class-oblt-hub.php:318
+msgid ""
+"Enter this code at checkout on tillpress.com for 20% off a yearly license:"
+msgstr ""
+"Geben Sie diesen Code beim Checkout auf tillpress.com ein, um 20 % Rabatt "
+"auf eine Jahreslizenz zu erhalten:"
+
+#: includes/class-oblt-hub.php:319
+msgid "See OrderBay"
+msgstr "OrderBay ansehen"
+
+#: includes/class-oblt-hub.php:320
+msgid "Hide this offer"
+msgstr "Dieses Angebot ausblenden"
+
+#: includes/class-oblt-hub.php:322
+msgid ""
+"OrderBay Lite is complete and is never locked. The paid plugin is a separate"
+" download; this code is optional."
+msgstr ""
+"OrderBay Lite ist vollständig und wird nie gesperrt. Das kostenpflichtige "
+"Plugin ist ein separater Download; dieser Code ist optional."
+
+#. translators: %s: invoice number.
+#: includes/class-oblt-invoicing.php:235
+#, php-format
+msgid "OrderBay Lite invoice number assigned: %s"
+msgstr "OrderBay-Lite-Rechnungsnummer vergeben: %s"
+
+#. translators: %s: credit note number.
+#: includes/class-oblt-invoicing.php:257
+#, php-format
+msgid "OrderBay Lite credit note number issued: %s"
+msgstr "OrderBay-Lite-Rechnungskorrekturnummer vergeben: %s"
+
+#. translators: 1: document number, 2: document type
+#: includes/class-oblt-invoicing.php:622
+#, php-format
+msgid ""
+"Document number %1$s (%2$s) was allocated by a request that lost its lock "
+"and was not used. This order keeps its existing number."
+msgstr ""
+"Die Dokumentnummer %1$s (%2$s) wurde von einer Anfrage vergeben, die ihre "
+"Sperre verloren hat, und nicht verwendet. Diese Bestellung behält ihre "
+"bestehende Nummer."
+
+#: includes/class-oblt-invoicing.php:664
+#: includes/class-oblt-invoicing.php:1193
+msgid ""
+"OrderBay Lite could not allocate a document number. The document was not "
+"saved."
+msgstr ""
+"OrderBay Lite konnte keine Dokumentnummer vergeben. Das Dokument wurde nicht"
+" gespeichert."
+
+#: includes/class-oblt-invoicing.php:962 includes/class-oblt-invoicing.php:977
+msgid "OrderBay Lite could not update the document counter."
+msgstr "OrderBay Lite konnte den Dokumentzähler nicht aktualisieren."
+
+#: includes/class-oblt-invoicing.php:987
+msgid ""
+"OrderBay Lite could not allocate a document number after repeated conflicts."
+" The document was not saved."
+msgstr ""
+"OrderBay Lite konnte nach wiederholten Konflikten keine Dokumentnummer "
+"vergeben. Das Dokument wurde nicht gespeichert."
+
+#: includes/class-oblt-invoicing.php:1158
+#: includes/class-oblt-invoicing.php:1170
+msgid "OrderBay Lite could not seed the document counter."
+msgstr "OrderBay Lite konnte den Dokumentzähler nicht initialisieren."
+
+#: includes/class-oblt-invoicing.php:1183
+msgid "OrderBay Lite could not allocate a document number."
+msgstr "OrderBay Lite konnte keine Dokumentnummer vergeben."
+
+#: includes/class-oblt-invoicing.php:1219
+msgid "Not assigned yet (assigned on first print)"
+msgstr "Noch nicht vergeben (wird beim ersten Druck vergeben)"
+
+#: includes/class-oblt-invoicing.php:1222
+msgid "Credit note #"
+msgstr "Rechnungskorrektur-Nr."
+
+#: includes/class-oblt-invoicing.php:1238
+msgid "Print credit note"
+msgstr "Rechnungskorrektur drucken"
+
+#: includes/class-oblt-invoicing.php:1244
+msgid "OrderBay Lite: issue credit note number"
+msgstr "OrderBay Lite: Rechnungskorrekturnummer vergeben"
+
+#: includes/class-oblt-invoicing.php:1245
+msgid "OrderBay Lite: print credit note"
+msgstr "OrderBay Lite: Rechnungskorrektur drucken"
+
+#: includes/class-oblt-invoicing.php:1289
+msgid "No refunds and no credit note number on this order."
+msgstr ""
+"Keine Erstattungen und keine Rechnungskorrekturnummer für diese Bestellung."
+
+#: includes/class-oblt-invoicing.php:1294
+msgid ""
+"A credit note number could not be allocated. The document was not rendered."
+msgstr ""
+"Es konnte keine Rechnungskorrekturnummer vergeben werden. Das Dokument wurde"
+" nicht erzeugt."
+
+#: includes/class-oblt-invoicing.php:1356
+msgid "Invoice PDF"
+msgstr "Rechnungs-PDF"
+
+#: includes/class-oblt-invoicing.php:1369
+msgid "Print invoice"
+msgstr "Rechnung drucken"
+
+#: includes/class-oblt-invoicing.php:1413
+msgid "Invalid invoice request."
+msgstr "Ungültige Rechnungsanfrage."
+
+#: includes/class-oblt-invoicing.php:1417
+msgid "You cannot view this invoice."
+msgstr "Sie dürfen diese Rechnung nicht ansehen."
+
+#: includes/class-oblt-invoicing.php:1421
+msgid ""
+"Your invoice could not be prepared because a document number could not be "
+"allocated. Please try again or contact the store."
+msgstr ""
+"Ihre Rechnung konnte nicht erstellt werden, da keine Dokumentnummer vergeben"
+" werden konnte. Bitte versuchen Sie es erneut oder wenden Sie sich an den "
+"Shop."
+
+#: includes/class-oblt-invoicing.php:1427
+msgid ""
+"Your invoice PDF could not be prepared. Please use Print invoice instead, or"
+" contact the store."
+msgstr ""
+"Ihre Rechnungs-PDF konnte nicht erstellt werden. Bitte nutzen Sie "
+"stattdessen „Rechnung drucken“ oder wenden Sie sich an den Shop."
+
+#: includes/class-oblt-plugin.php:75
+msgid "Thank you for your order."
+msgstr "Vielen Dank für Ihre Bestellung."
+
+#: includes/class-oblt-review-nudge.php:196
+msgid ""
+"OrderBay Lite has numbered and sent your invoices for a while now. If it has"
+" been useful, a short review on WordPress.org helps other store owners find "
+"it. If something is not working, tell us and we will help."
+msgstr ""
+"OrderBay Lite nummeriert und versendet Ihre Rechnungen jetzt schon eine "
+"Weile. Wenn es Ihnen nützlich war, hilft eine kurze Bewertung auf "
+"WordPress.org anderen Shop-Betreibern, es zu finden. Wenn etwas nicht "
+"funktioniert, sagen Sie uns Bescheid, wir helfen Ihnen gern."
+
+#: includes/class-oblt-review-nudge.php:198
+msgid "Leave a review"
+msgstr "Bewertung abgeben"
+
+#: includes/class-oblt-review-nudge.php:199
+msgid "Get help"
+msgstr "Hilfe erhalten"
+
+#: includes/class-oblt-review-nudge.php:201
+msgid "Maybe later"
+msgstr "Vielleicht später"
+
+#: includes/class-oblt-review-nudge.php:203
+msgid "Dismiss"
+msgstr "Ausblenden"
+
+#: includes/class-oblt-support.php:83 includes/class-oblt-support.php:215
+msgid "Please describe the problem first."
+msgstr "Bitte beschreiben Sie zuerst das Problem."
+
+#: includes/class-oblt-support.php:84 includes/class-oblt-support.php:212
+msgid "Please enter the email address we should reply to."
+msgstr "Bitte geben Sie die E-Mail-Adresse an, an die wir antworten sollen."
+
+#: includes/class-oblt-support.php:85 includes/class-oblt-support.php:209
+msgid "Please tick the box to allow sending this ticket to Tillpress."
+msgstr ""
+"Bitte haken Sie das Kästchen an, um das Senden dieses Tickets an Tillpress "
+"zu erlauben."
+
+#: includes/class-oblt-support.php:86
+msgid "Sending…"
+msgstr "Wird gesendet …"
+
+#. translators: %s: ticket number such as TP-00042.
+#: includes/class-oblt-support.php:88
+#, php-format
+msgid ""
+"Sent. Your ticket number is %s. We reply by email, usually within one "
+"business day."
+msgstr ""
+"Gesendet. Ihre Ticketnummer lautet %s. Wir antworten per E-Mail, in der "
+"Regel innerhalb eines Werktags."
+
+#: includes/class-oblt-support.php:89
+msgid "Could not send from this site:"
+msgstr "Senden von dieser Website aus nicht möglich:"
+
+#: includes/class-oblt-support.php:90
+msgid "Use \"Email instead\" below; it opens the same ticket in your email app."
+msgstr ""
+"Verwenden Sie unten „Stattdessen per E-Mail“; dadurch wird dasselbe Ticket "
+"in Ihrem E-Mail-Programm geöffnet."
+
+#: includes/class-oblt-support.php:91
+msgid ""
+"Your email app should open with the ticket filled in. The full ticket is "
+"also on your clipboard."
+msgstr ""
+"Ihr E-Mail-Programm sollte sich mit dem ausgefüllten Ticket öffnen. Das "
+"vollständige Ticket befindet sich außerdem in Ihrer Zwischenablage."
+
+#: includes/class-oblt-support.php:92
+msgid "[Shortened. The full ticket was copied to the clipboard.]"
+msgstr ""
+"[Gekürzt. Das vollständige Ticket wurde in die Zwischenablage kopiert.]"
+
+#: includes/class-oblt-support.php:93
+msgid "Ticket copied. Paste it into an email to info@tillpress.com."
+msgstr ""
+"Ticket kopiert. Fügen Sie es in eine E-Mail an info@tillpress.com ein."
+
+#: includes/class-oblt-support.php:94
+msgid ""
+"Could not copy automatically. Select the system report and copy it by hand."
+msgstr ""
+"Automatisches Kopieren nicht möglich. Markieren Sie den Systembericht und "
+"kopieren Sie ihn manuell."
+
+#: includes/class-oblt-support.php:292 includes/class-oblt-withdrawal.php:615
+msgid "Your name"
+msgstr "Ihr Name"
+
+#: includes/class-oblt-support.php:293
+msgid "Reply-to email"
+msgstr "Antwort-E-Mail-Adresse"
+
+#: includes/class-oblt-support.php:294
+msgid "Topic"
+msgstr "Thema"
+
+#: includes/class-oblt-support.php:296
+msgid "Something is not working"
+msgstr "Etwas funktioniert nicht"
+
+#: includes/class-oblt-support.php:297
+msgid "Setup question"
+msgstr "Frage zur Einrichtung"
+
+#: includes/class-oblt-support.php:298
+msgid "Feature request"
+msgstr "Funktionswunsch"
+
+#: includes/class-oblt-support.php:299
+msgid "License or billing"
+msgstr "Lizenz oder Abrechnung"
+
+#: includes/class-oblt-support.php:300
+msgid "Other"
+msgstr "Sonstiges"
+
+#: includes/class-oblt-support.php:305
+msgid "Subject"
+msgstr "Betreff"
+
+#: includes/class-oblt-support.php:306
+msgid "What happened, and what did you expect?"
+msgstr "Was ist passiert, und was haben Sie erwartet?"
+
+#: includes/class-oblt-support.php:307
+msgid ""
+"Include the system report (versions, theme, active plugins; no passwords or "
+"customer data)"
+msgstr ""
+"Systembericht beifügen (Versionen, Theme, aktive Plugins; keine Passwörter "
+"oder Kundendaten)"
+
+#: includes/class-oblt-support.php:308
+msgid "Show system report"
+msgstr "Systembericht anzeigen"
+
+#. translators: 1: privacy policy URL.
+#: includes/class-oblt-support.php:313
+#, php-format
+msgid ""
+"Send this ticket to Tillpress at tillpress.com. It includes your name, "
+"email, message, this site's address, and (if ticked) the system report. Used"
+" only to answer you. <a href=\"%1$s\" target=\"_blank\" rel=\"noopener "
+"noreferrer\">Privacy policy</a>."
+msgstr ""
+"Dieses Ticket wird an Tillpress unter tillpress.com gesendet. Es enthält "
+"Ihren Namen, Ihre E-Mail-Adresse, Ihre Nachricht, die Adresse dieser Website"
+" und (falls angehakt) den Systembericht. Die Daten werden ausschließlich zur"
+" Beantwortung Ihrer Anfrage verwendet. <a href=\"%1$s\" target=\"_blank\" "
+"rel=\"noopener noreferrer\">Datenschutzerklärung</a>."
+
+#: includes/class-oblt-support.php:325
+msgid "Send ticket"
+msgstr "Ticket senden"
+
+#: includes/class-oblt-support.php:326
+msgid "Email instead"
+msgstr "Stattdessen per E-Mail"
+
+#: includes/class-oblt-support.php:327
+msgid "Copy ticket"
+msgstr "Ticket kopieren"
+
+#: includes/class-oblt-support.php:330
+msgid ""
+"Replies Monday to Friday, 09:00 to 17:00 Pacific Time. First reply within "
+"one business day."
+msgstr ""
+"Antworten Montag bis Freitag, 09:00 bis 17:00 Uhr Pacific Time. Erste "
+"Antwort innerhalb eines Werktags."
+
+#: includes/class-oblt-withdrawal.php:102
+#: includes/class-oblt-withdrawal.php:628
+msgid "Withdraw from contract"
+msgstr "Vom Vertrag zurücktreten"
+
+#: includes/class-oblt-withdrawal.php:117
+msgid "EU withdrawal button"
+msgstr "Widerrufsbutton der EU"
+
+#: includes/class-oblt-withdrawal.php:118
+msgid ""
+"Since 19 June 2026, shops selling online to consumers in the EU must offer "
+"an easy way to withdraw from a purchase: a clearly labelled link, a "
+"confirmation step, and an emailed acknowledgement. This is a tool, not legal"
+" advice."
+msgstr ""
+"Seit dem 19. Juni 2026 müssen Shops, die online an Verbraucher in der EU "
+"verkaufen, eine einfache Möglichkeit zum Widerruf eines Kaufs anbieten: "
+"einen deutlich beschrifteten Link, einen Bestätigungsschritt und eine "
+"Empfangsbestätigung per E-Mail. Dies ist ein Hilfsmittel, keine "
+"Rechtsberatung."
+
+#: includes/class-oblt-withdrawal.php:120
+msgid "Withdrawal button"
+msgstr "Widerrufsbutton"
+
+#: includes/class-oblt-withdrawal.php:120
+msgid "Let customers withdraw from orders online"
+msgstr "Kunden können Bestellungen online widerrufen"
+
+#: includes/class-oblt-withdrawal.php:121
+msgid "Withdrawal period (days)"
+msgstr "Widerrufsfrist (Tage)"
+
+#: includes/class-oblt-withdrawal.php:122
+msgid ""
+"Counted from the day the order was completed. Orders not yet completed can "
+"always be withdrawn. The legal minimum is 14 days."
+msgstr ""
+"Gezählt ab dem Tag des Bestellabschlusses. Noch nicht abgeschlossene "
+"Bestellungen können jederzeit widerrufen werden. Das gesetzliche Minimum "
+"beträgt 14 Tage."
+
+#: includes/class-oblt-withdrawal.php:123
+msgid "Withdrawal page"
+msgstr "Widerrufsseite"
+
+#: includes/class-oblt-withdrawal.php:129
+msgid "Create one for me"
+msgstr "Für mich erstellen"
+
+#: includes/class-oblt-withdrawal.php:133
+msgid "The page must contain the [orderbay_lite_withdrawal] shortcode."
+msgstr "Die Seite muss den Shortcode [orderbay_lite_withdrawal] enthalten."
+
+#: includes/class-oblt-withdrawal.php:134
+msgid "Footer link"
+msgstr "Link in der Fußzeile"
+
+#: includes/class-oblt-withdrawal.php:134
+msgid "Show \"Withdraw from contract here\" at the bottom of every page"
+msgstr "„Vertrag hier widerrufen“ am Ende jeder Seite anzeigen"
+
+#: includes/class-oblt-withdrawal.php:135
+msgid ""
+"The link must stay easy to find. If your theme hides footer output, add the "
+"page to your footer menu instead."
+msgstr ""
+"Der Link muss leicht auffindbar bleiben. Falls Ihr Theme die "
+"Fußzeilenausgabe unterdrückt, fügen Sie die Seite stattdessen Ihrem "
+"Fußzeilenmenü hinzu."
+
+#: includes/class-oblt-withdrawal.php:136
+msgid "Send withdrawals to"
+msgstr "Widerrufe senden an"
+
+#: includes/class-oblt-withdrawal.php:204
+#: includes/class-oblt-withdrawal.php:236
+msgid "Withdraw from contract here"
+msgstr "Vertrag hier widerrufen"
+
+#: includes/class-oblt-withdrawal.php:216
+msgid "Withdraw"
+msgstr "Widerrufen"
+
+#. translators: %s: date and time the withdrawal was received
+#: includes/class-oblt-withdrawal.php:232
+#, php-format
+msgid "Withdrawal received on %s."
+msgstr "Widerruf am %s eingegangen."
+
+#. translators: %s: date and time
+#: includes/class-oblt-withdrawal.php:253
+#, php-format
+msgid "Customer withdrew on %s"
+msgstr "Kunde hat am %s widerrufen"
+
+#: includes/class-oblt-withdrawal.php:256
+#: includes/class-oblt-withdrawal.php:457
+msgid "Reason:"
+msgstr "Grund:"
+
+#: includes/class-oblt-withdrawal.php:303
+msgid "Withdrawal from the whole order."
+msgstr "Widerruf der gesamten Bestellung."
+
+#. translators: %s: list of items
+#: includes/class-oblt-withdrawal.php:312
+#, php-format
+msgid "Withdrawal from: %s"
+msgstr "Widerruf von: %s"
+
+#: includes/class-oblt-withdrawal.php:335
+msgid "Your session expired. Please try again."
+msgstr "Ihre Sitzung ist abgelaufen. Bitte versuchen Sie es erneut."
+
+#: includes/class-oblt-withdrawal.php:355
+msgid "Please enter your name, order number and email address."
+msgstr ""
+"Bitte geben Sie Ihren Namen, Ihre Bestellnummer und Ihre E-Mail-Adresse an."
+
+#: includes/class-oblt-withdrawal.php:359
+msgid "Too many attempts. Please wait an hour or contact us."
+msgstr ""
+"Zu viele Versuche. Bitte warten Sie eine Stunde oder kontaktieren Sie uns."
+
+#: includes/class-oblt-withdrawal.php:369
+msgid "We have already received a withdrawal for this order."
+msgstr "Für diese Bestellung ist bereits ein Widerruf eingegangen."
+
+#: includes/class-oblt-withdrawal.php:375
+msgid ""
+"The withdrawal period for this order has ended. Please contact us if you "
+"think this is wrong."
+msgstr ""
+"Die Widerrufsfrist für diese Bestellung ist abgelaufen. Bitte kontaktieren "
+"Sie uns, falls Sie dies für einen Fehler halten."
+
+#: includes/class-oblt-withdrawal.php:376
+msgid ""
+"This order is already cancelled or refunded, so there is nothing to withdraw"
+" from."
+msgstr ""
+"Diese Bestellung ist bereits storniert oder erstattet, daher gibt es nichts "
+"zu widerrufen."
+
+#. translators: %s: order number
+#: includes/class-oblt-withdrawal.php:404
+#, php-format
+msgid "Confirm your withdrawal from order %s"
+msgstr "Bestätigen Sie Ihren Widerruf der Bestellung %s"
+
+#: includes/class-oblt-withdrawal.php:405
+msgid ""
+"You asked to withdraw from your order. To finish, open this link and press "
+"\"Confirm withdrawal here\":"
+msgstr ""
+"Sie haben den Widerruf Ihrer Bestellung angefordert. Öffnen Sie zum "
+"Abschluss diesen Link und klicken Sie auf „Widerruf hier bestätigen“:"
+
+#: includes/class-oblt-withdrawal.php:405
+msgid ""
+"The link works for 7 days. If you did not ask for this, ignore this email."
+msgstr ""
+"Der Link ist 7 Tage gültig. Wenn Sie dies nicht angefordert haben, "
+"ignorieren Sie diese E-Mail."
+
+#: includes/class-oblt-withdrawal.php:439
+msgid ""
+"This confirmation link has expired or was already used. Please start again."
+msgstr ""
+"Dieser Bestätigungslink ist abgelaufen oder wurde bereits verwendet. Bitte "
+"beginnen Sie von vorn."
+
+#: includes/class-oblt-withdrawal.php:457
+msgid "Customer withdrew from the contract online."
+msgstr "Der Kunde hat den Vertrag online widerrufen."
+
+#. translators: %s: order number
+#: includes/class-oblt-withdrawal.php:466
+#, php-format
+msgid "We received your withdrawal from order %s"
+msgstr "Wir haben Ihren Widerruf der Bestellung %s erhalten"
+
+#: includes/class-oblt-withdrawal.php:467
+msgid "This confirms we received your withdrawal. Please keep this email."
+msgstr ""
+"Hiermit bestätigen wir den Eingang Ihres Widerrufs. Bitte bewahren Sie diese"
+" E-Mail auf."
+
+#. translators: %s: order number
+#: includes/class-oblt-withdrawal.php:474
+#, php-format
+msgid "Withdrawal received for order %s"
+msgstr "Widerruf für Bestellung %s eingegangen"
+
+#: includes/class-oblt-withdrawal.php:475
+msgid "Open the order"
+msgstr "Bestellung öffnen"
+
+#: includes/class-oblt-withdrawal.php:497
+msgid "Order"
+msgstr "Bestellung"
+
+#: includes/class-oblt-withdrawal.php:498
+msgid "Name"
+msgstr "Name"
+
+#: includes/class-oblt-withdrawal.php:499
+msgid "Email"
+msgstr "E-Mail"
+
+#: includes/class-oblt-withdrawal.php:500
+msgid "Withdrawal"
+msgstr "Widerruf"
+
+#: includes/class-oblt-withdrawal.php:501
+msgid "Received"
+msgstr "Eingegangen"
+
+#: includes/class-oblt-withdrawal.php:504
+msgid "Reason"
+msgstr "Grund"
+
+#: includes/class-oblt-withdrawal.php:558
+msgid "Your withdrawal has been received. We have emailed you a confirmation."
+msgstr ""
+"Ihr Widerruf ist eingegangen. Wir haben Ihnen eine Bestätigung per E-Mail "
+"gesendet."
+
+#: includes/class-oblt-withdrawal.php:561
+msgid ""
+"Your withdrawal has been received. Check your email for the confirmation."
+msgstr ""
+"Ihr Widerruf ist eingegangen. Die Bestätigung finden Sie in Ihrem E-Mail-"
+"Postfach."
+
+#: includes/class-oblt-withdrawal.php:566
+msgid ""
+"This confirmation link has expired or was already used. Please start again "
+"below."
+msgstr ""
+"Dieser Bestätigungslink ist abgelaufen oder wurde bereits verwendet. Bitte "
+"beginnen Sie unten von vorn."
+
+#: includes/class-oblt-withdrawal.php:570
+msgid "Check and confirm your withdrawal"
+msgstr "Widerruf prüfen und bestätigen"
+
+#: includes/class-oblt-withdrawal.php:586
+msgid "Confirm withdrawal here"
+msgstr "Widerruf hier bestätigen"
+
+#: includes/class-oblt-withdrawal.php:590
+msgid ""
+"Thank you. If the details match an order, we have sent a confirmation link "
+"to the order's email address. Open it to confirm your withdrawal."
+msgstr ""
+"Vielen Dank. Wenn die Angaben zu einer Bestellung passen, haben wir einen "
+"Bestätigungslink an die E-Mail-Adresse der Bestellung gesendet. Öffnen Sie "
+"ihn, um Ihren Widerruf zu bestätigen."
+
+#: includes/class-oblt-withdrawal.php:611
+msgid ""
+"Use this form to withdraw from a purchase. Choosing items is optional; leave"
+" them all unticked to withdraw from the whole order."
+msgstr ""
+"Verwenden Sie dieses Formular, um einen Kauf zu widerrufen. Die Auswahl "
+"einzelner Artikel ist optional; lassen Sie alle abgewählt, um die gesamte "
+"Bestellung zu widerrufen."
+
+#: includes/class-oblt-withdrawal.php:616
+msgid "Order number"
+msgstr "Bestellnummer"
+
+#: includes/class-oblt-withdrawal.php:618
+msgid "Email address used for the order"
+msgstr "Bei der Bestellung verwendete E-Mail-Adresse"
+
+#: includes/class-oblt-withdrawal.php:621
+msgid "Items (optional)"
+msgstr "Artikel (optional)"
+
+#: includes/class-oblt-withdrawal.php:627
+msgid "Reason (optional)"
+msgstr "Grund (optional)"
+
+#: orderbay-lite.php:118
+msgid ""
+"OrderBay (paid) is active, so OrderBay Lite is idle. You can deactivate Lite"
+" — the paid plugin already includes these invoicing tools."
+msgstr ""
+"OrderBay (kostenpflichtig) ist aktiv, daher ist OrderBay Lite inaktiv. Sie "
+"können Lite deaktivieren – das kostenpflichtige Plugin enthält diese "
+"Rechnungsfunktionen bereits."
+
+#. translators: %s: plugin name
+#: orderbay-lite.php:130
+#, php-format
+msgid "<strong>%s</strong> requires WooCommerce to be active."
+msgstr "<strong>%s</strong> erfordert ein aktives WooCommerce."
+
+#: templates/credit-note.php:20 templates/invoice.php:21
+#: templates/packing-slip.php:23
+msgid "Print / Save as PDF"
+msgstr "Drucken / Als PDF speichern"
+
+#. translators: %s: credit note number.
+#: templates/credit-note.php:34
+#, php-format
+msgid "Credit note %s"
+msgstr "Rechnungskorrektur %s"
+
+#. translators: %s: order number.
+#: templates/credit-note.php:42
+#, php-format
+msgid "Order #%s"
+msgstr "Bestellung #%s"
+
+#: templates/credit-note.php:46 templates/invoice.php:50
+#: templates/packing-slip.php:47
+msgid "From"
+msgstr "Absender"
+
+#: templates/credit-note.php:47 templates/invoice.php:55
+msgid "Bill to"
+msgstr "Rechnungsadresse"
+
+#: templates/credit-note.php:53
+msgid "Refund / item"
+msgstr "Erstattung / Artikel"
+
+#: templates/credit-note.php:54
+msgid "Amount (excl. tax)"
+msgstr "Betrag (ohne Steuer)"
+
+#: templates/credit-note.php:76
+msgid "Refund"
+msgstr "Erstattung"
+
+#: templates/credit-note.php:86
+msgid ""
+"No WooCommerce refunds recorded on this order. Credit note number issued for"
+" staff records."
+msgstr ""
+"Keine WooCommerce-Erstattungen für diese Bestellung erfasst. "
+"Rechnungskorrekturnummer für interne Zwecke vergeben."
+
+#: templates/credit-note.php:96
+msgid "Shipping refunded"
+msgstr "Erstatteter Versand"
+
+#: templates/credit-note.php:99
+msgid "Tax refunded"
+msgstr "Erstattete Steuer"
+
+#: templates/credit-note.php:102
+msgid "Total credited"
+msgstr "Rechnungskorrektur gesamt"
+
+#. translators: 1: document count, 2: paper size.
+#: templates/invoice.php:24 templates/packing-slip.php:26
+#, php-format
+msgid "%1$d document(s) · paper: %2$s"
+msgstr "%1$d Dokument(e) · Papierformat: %2$s"
+
+#. translators: 1: invoice number, 2: order number.
+#: templates/invoice.php:38
+#, php-format
+msgid "Invoice %1$s — Order #%2$s"
+msgstr "Rechnung %1$s — Bestellung #%2$s"
+
+#. translators: %s: order number.
+#: templates/invoice.php:41
+#, php-format
+msgid "Invoice — Order #%s"
+msgstr "Rechnung — Bestellung #%s"
+
+#: templates/invoice.php:44
+msgid "Invoice number"
+msgstr "Rechnungsnummer"
+
+#: templates/invoice.php:51 templates/invoice.php:156
+msgid "VAT / Tax ID"
+msgstr "USt-IdNr. / Steuernummer"
+
+#: templates/invoice.php:64 templates/packing-slip.php:50
+msgid "Ship to"
+msgstr "Lieferadresse"
+
+#: templates/invoice.php:70 templates/packing-slip.php:66
+msgid "Item"
+msgstr "Artikel"
+
+#: templates/invoice.php:71 templates/packing-slip.php:67
+msgid "SKU"
+msgstr "Art.-Nr."
+
+#: templates/invoice.php:72 templates/packing-slip.php:68
+msgid "Qty"
+msgstr "Menge"
+
+#: templates/invoice.php:73 templates/invoice.php:116
+msgid "Total"
+msgstr "Gesamtbetrag"
+
+#: templates/invoice.php:92
+msgid "Subtotal"
+msgstr "Zwischensumme"
+
+#: templates/invoice.php:104
+msgid "Prices include tax"
+msgstr "Preise inkl. Steuer"
+
+#: templates/invoice.php:104
+msgid "Prices exclude tax"
+msgstr "Preise exkl. Steuer"
+
+#: templates/invoice.php:111
+msgid "Discount"
+msgstr "Rabatt"
+
+#: templates/invoice.php:124
+msgid "Payment"
+msgstr "Zahlung"
+
+#: templates/invoice.php:134
+msgid "Payment due by"
+msgstr "Zahlbar bis"
+
+#: templates/invoice.php:136
+msgid "Bank transfer to"
+msgstr "Überweisung an"
+
+#: templates/invoice.php:140
+msgid "Payment reference"
+msgstr "Verwendungszweck"
+
+#: templates/invoice.php:151 templates/packing-slip.php:93
+msgid "Customer note"
+msgstr "Anmerkung des Kunden"
+
+#. translators: %s: order number.
+#: templates/packing-slip.php:38
+#, php-format
+msgid "Packing slip — Order #%s"
+msgstr "Lieferschein — Bestellung #%s"
+
+#: templates/packing-slip.php:59
+msgid "Customer"
+msgstr "Kunde"
+
+#: includes/class-oblt-documents.php:170
+msgid "Order on hold (customer): bank transfer and other unpaid orders"
+msgstr ""
+"Bestellung in Wartestellung (Kunde): Überweisung und andere unbezahlte "
+"Bestellungen"
+
+#: includes/class-oblt-einvoice.php:120 includes/class-oblt-einvoice.php:152
+#: templates/invoice.php:59
+msgid "VAT ID"
+msgstr "USt-IdNr."
+
+#: includes/class-oblt-einvoice.php:130
+msgid ""
+"For business and public-sector invoices, if your accounts team gave you one."
+msgstr ""
+"Für Rechnungen an Unternehmen und öffentliche Auftraggeber, falls Ihre "
+"Buchhaltung Ihnen eine genannt hat."
+
+#: includes/class-oblt-einvoice.php:480
+msgid "Tax-free sales to EU businesses"
+msgstr "Steuerfreie Verkäufe an Unternehmen in der EU"
+
+#: includes/class-oblt-einvoice.php:482
+msgid "Goods: intra-community supply"
+msgstr "Waren: innergemeinschaftliche Lieferung"
+
+#: includes/class-oblt-einvoice.php:483
+msgid "Services: reverse charge"
+msgstr ""
+"Dienstleistungen: Steuerschuldnerschaft des Leistungsempfängers (Reverse "
+"Charge)"
+
+#: includes/class-oblt-einvoice.php:484
+msgid ""
+"When WooCommerce charged 0% VAT to a business with a VAT ID in another EU "
+"country, invoices and e-invoices name the reason. Deliveries outside the EU "
+"are marked as exports. Your tax setup in WooCommerce still decides whether "
+"VAT is charged."
+msgstr ""
+"Wenn WooCommerce einem Unternehmen mit USt-IdNr. aus einem anderen EU-Land 0"
+" % USt. berechnet hat, nennen Rechnungen und E-Rechnungen den Grund. "
+"Lieferungen außerhalb der EU werden als Ausfuhr gekennzeichnet. Ob USt. "
+"berechnet wird, entscheidet weiterhin Ihre Steuereinrichtung in WooCommerce."
+
+#: includes/class-oblt-einvoice.php:485
+msgid "Checkout fields"
+msgstr "Felder an der Kasse"
+
+#: includes/class-oblt-einvoice.php:486
+msgid "Ask for the buyer's VAT ID (optional field)"
+msgstr "USt-IdNr. des Käufers abfragen (optionales Feld)"
+
+#: includes/class-oblt-einvoice.php:487
+msgid "Ask for a buyer reference / Leitweg-ID (optional field)"
+msgstr "Käuferreferenz / Leitweg-ID abfragen (optionales Feld)"
+
+#: includes/class-oblt-einvoice.php:488
+msgid ""
+"Works with the classic and the block checkout. The values go on the invoice "
+"and into the e-invoice; a business buyer's VAT ID from another EU country "
+"lets a 0% order be marked as an intra-EU supply."
+msgstr ""
+"Funktioniert mit der klassischen und der Block-Kasse. Die Angaben erscheinen"
+" auf der Rechnung und in der E-Rechnung; die USt-IdNr. eines Unternehmens "
+"aus einem anderen EU-Land ermöglicht es, eine Bestellung mit 0 % als "
+"innergemeinschaftliche Lieferung zu kennzeichnen."
+
+#: includes/class-oblt-einvoice.php:987
+msgid "Intra-community supply (tax-free under Article 138 VAT Directive)"
+msgstr ""
+"Steuerfreie innergemeinschaftliche Lieferung (Art. 138 MwStSystRL, § 4 Nr. "
+"1b UStG)"
+
+#: includes/class-oblt-einvoice.php:989
+msgid "Reverse charge: VAT is payable by the customer"
+msgstr "Steuerschuldnerschaft des Leistungsempfängers (Reverse Charge)"
+
+#: includes/class-oblt-einvoice.php:991
+msgid "Export outside the EU (tax-free)"
+msgstr "Steuerfreie Ausfuhrlieferung (außerhalb der EU)"
+
+#: includes/class-oblt-invoicing.php:1230
+msgid ""
+"This order was refunded. Issue a credit note so the refund has its own "
+"numbered document for your books and your customer."
+msgstr ""
+"Diese Bestellung wurde erstattet. Erstellen Sie eine Rechnungskorrektur, "
+"damit die Erstattung ein eigenes nummeriertes Dokument für Ihre Buchhaltung "
+"und Ihren Kunden hat."
+
+#: includes/class-oblt-invoicing.php:1231
+msgid "Issue credit note"
+msgstr "Rechnungskorrektur erstellen"
+
+#: templates/invoice.php:60
+msgid "Buyer reference"
+msgstr "Käuferreferenz"
+
+#, php-format
+msgid "Corrects invoice %1$s of %2$s."
+msgstr "Korrektur zur Rechnung %1$s vom %2$s."
+
+#, php-format
+msgid "Refers to order #%1$s of %2$s."
+msgstr "Bezieht sich auf Bestellung #%1$s vom %2$s."
+
+#, php-format
+msgid "%s (incl. tax)"
+msgstr "%s (inkl. Steuer)"
+
+#, php-format
+msgid "Paid on %s."
+msgstr "Bezahlt am %s."
+
+msgid ""
+"Please enter a valid VAT ID (for example DE123456789), or leave the field "
+"empty."
+msgstr ""
+"Bitte geben Sie eine gültige USt-IdNr. ein (z. B. DE123456789) oder lassen "
+"Sie das Feld leer."

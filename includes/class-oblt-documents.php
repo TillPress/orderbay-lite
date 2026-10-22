@@ -167,6 +167,7 @@ class OBLT_Documents {
 		echo '<label><input type="checkbox" name="' . esc_attr( OBLT_Plugin::OPT_DOCS ) . '[email_attach_on]" value="1"' . checked( OBLT_Pdf::attach_enabled( $s ), true, false ) . ' /> ';
 		echo esc_html__( 'Attach the invoice PDF to the WooCommerce emails ticked below', 'orderbay-lite' ) . '</label>';
 		$labels   = array(
+			'customer_on_hold_order'    => __( 'Order on hold (customer): bank transfer and other unpaid orders', 'orderbay-lite' ),
 			'customer_processing_order' => __( 'Processing order (customer)', 'orderbay-lite' ),
 			'customer_completed_order'  => __( 'Completed order (customer)', 'orderbay-lite' ),
 			'customer_invoice'          => __( 'Customer invoice / Order details (customer)', 'orderbay-lite' ),
