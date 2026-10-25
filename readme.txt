@@ -4,7 +4,7 @@ Tags: woocommerce, invoice, xrechnung, zugferd, e-invoice
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.6.0
+Stable tag: 1.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 WC requires at least: 7.0
@@ -112,6 +112,9 @@ Peppol sending through your own Recommand account, delivery notes, shipping labe
 
 
 
+
+= 1.6.1 =
+* Refreshed admin look, shared across Tillpress plugins: rounded cards, pill tabs and buttons, settings forms and tables as cards. Only the plugin's own screens change; no settings or data change.
 = 1.6.0 =
 * New: customers can print or download their credit note as a PDF from My Account (Orders list and the order page) once the store has issued one. Customers never cause a new number.
 * German: new strings translated.
